@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GameVault Market</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Firebase COMPAT SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+<h1>GameVault Market</h1>
+<p>Secure Marketplace for Game Accounts</p>
+</header>
+
+<nav id="nav" class="hidden">
+<button onclick="show('home')">Home</button>
+<button id="sellBtn" onclick="show('sell')" class="hidden">Sell</button>
+<button id="adminBtn" onclick="show('admin')" class="hidden">Admin</button>
+<button onclick="logout()">Logout</button>
+</nav>
+
+<div class="container">
+
+<!-- AUTH -->
+<div id="auth">
+<h2>Login / Sign Up</h2>
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
+<select id="role">
+<option value="buyer">Buyer</option>
+<option value="seller">Seller</option>
+</select>
+<button onclick="signup()">Sign Up</button>
+<button onclick="login()">Login</button>
+</div>
+
+<!-- HOME -->
+<div id="home" class="hidden">
+<h2>Listings</h2>
+<div id="listings"></div>
+</div>
+
+<!-- SELL -->
+<div id="sell" class="hidden">
+<h2>Sell Account</h2>
+<input id="game" placeholder="Game Name">
+<input id="details" placeholder="Account Details">
+<input id="price" placeholder="Price">
+<button onclick="postListing()">Submit for Approval</button>
+<p id="sellNote" style="color:yellow;">Your listing will only be visible after admin approval</p>
+</div>
+
+<!-- ADMIN -->
+<div id="admin" class="hidden">
+<h2>Admin Dashboard</h2>
+
+<h3>Pending Listings</h3>
+<div id="adminListings"></div>
+
+<h3>Reports</h3>
+<div id="adminReports"></div>
+
+<h3>Users</h3>
+<div id="adminUsers"></div>
+</div>
+
+<!-- CHAT -->
+<div id="chat" class="hidden">
+<h2>Chat</h2>
+<div id="chatBox" style="max-height:300px;overflow:auto"></div>
+<input id="chatMsg" placeholder="Message">
+<button onclick="sendMsg()">Send</button>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
