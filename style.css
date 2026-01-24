@@ -19,35 +19,75 @@ nav {
 }
 
 button {
+  width: 100%;
   padding: 10px;
+  margin: 6px 0;
   border: none;
-  border-radius: 5px;
-  cursor: pointer;
+  border-radius: 6px;
   background: #1e90ff;
-  color: #fff;
+  color: white;
+  cursor: pointer;
 }
 
-button:hover { background:#187bcd }
+button:hover {
+  background: #187bcd;
+}
 
 input, select {
   width: 100%;
   padding: 10px;
   margin: 6px 0;
-  border-radius: 5px;
+  border-radius: 6px;
   border: none;
 }
 
 .container {
   max-width: 900px;
   margin: auto;
-  padding: 20px;
+  padding: 15px;
 }
 
 .card {
-  background: rgba(255,255,255,.1);
-  padding: 15px;
+  background: rgba(255,255,255,.12);
+  padding: 12px;
   border-radius: 8px;
-  margin: 10px 0;
+  margin-bottom: 10px;
 }
 
-.hidden { display:none; }
+.hidden {
+  display: none;
+}
+
+.note {
+  color: yellow;
+  font-size: 14px;
+}
+
+#chatBox {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.pending { background: orange; color: black; }
+.approved { background: #1e90ff; }
+.holding { background: gold; color: black; }
+.completed { background: green; }
+.banned { background: red; }
+
+.chat-msg {
+  background: rgba(0,0,0,.3);
+  padding: 6px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+@media (min-width: 768px) {
+  button { width: auto; }
+}
