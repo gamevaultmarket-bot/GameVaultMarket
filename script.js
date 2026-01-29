@@ -1,6 +1,6 @@
 // FIREBASE
 firebase.initializeApp({
-  apiKey: "YOUR_KEY",
+  apiKey: "AIzaSyBfGXL6lKmBTZ9FIxsmsP_-40_-MZ33zBw",
   authDomain: "gamevaultmarket-5e494.firebaseapp.com",
   projectId: "gamevaultmarket-5e494",
   storageBucket: "gamevaultmarket-5e494.appspot.com"
