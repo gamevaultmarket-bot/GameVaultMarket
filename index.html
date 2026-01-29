@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <title>GameVault Market</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <link rel="stylesheet" href="style.css">
 </head>
@@ -16,70 +17,88 @@
 
 <header>
   <h1>GameVault Market</h1>
-  <p>Secure Game Account Marketplace (Escrow Protected)</p>
+  <p>P2P Game Account Marketplace</p>
 </header>
 
 <nav id="nav" class="hidden">
   <button onclick="show('home')">Home</button>
-  <button id="sellBtn" class="hidden" onclick="show('sell')">Sell</button>
-  <button id="adminBtn" class="hidden" onclick="openAdmin()">Admin</button>
+  <button onclick="show('sell')" id="sellBtn" class="hidden">Sell</button>
+  <button onclick="show('orders')">Orders</button>
+  <button onclick="show('admin')" id="adminBtn" class="hidden">Admin</button>
   <button onclick="logout()">Logout</button>
 </nav>
 
 <div class="container">
 
 <!-- AUTH -->
-<div id="auth">
-  <h2>Login / Sign Up</h2>
+<section id="auth">
+  <h2>Login / Register</h2>
   <input id="email" placeholder="Email">
   <input id="password" type="password" placeholder="Password">
+
   <select id="role">
     <option value="buyer">Buyer</option>
-    <option value="seller">Seller</option>
+    <option value="seller">Seller (Paid Verification)</option>
   </select>
+
   <button onclick="signup()">Sign Up</button>
   <button onclick="login()">Login</button>
-</div>
+</section>
+
+<!-- RISK -->
+<section id="risk" class="card hidden">
+  <h3>⚠️ Risk Notice</h3>
+  <p>GameVault does not hold funds or act as escrow.</p>
+  <label><input type="checkbox" id="agreeRisk"> I understand</label>
+  <button onclick="acceptRisk()">Continue</button>
+</section>
 
 <!-- HOME -->
-<div id="home" class="hidden">
+<section id="home" class="hidden">
   <h2>Listings</h2>
   <div id="listings"></div>
-</div>
+</section>
 
 <!-- SELL -->
-<div id="sell" class="hidden">
-  <h2>Sell Account</h2>
+<section id="sell" class="hidden">
+  <h2>Create Listing</h2>
   <input id="game" placeholder="Game name">
-  <input id="details" placeholder="Account details">
-  <input id="price" placeholder="Price (GHS)">
-  <button onclick="postListing()">Submit for approval</button>
-  <p class="note">Seller must be verified by admin</p>
-</div>
+  <textarea id="details" placeholder="Account details"></textarea>
+  <input id="price" placeholder="Price USD">
+  <input type="file" id="screenshot">
+  <button onclick="createListing()">Submit</button>
+</section>
+
+<!-- ORDERS -->
+<section id="orders" class="hidden">
+  <h2>My Orders</h2>
+  <div id="orderList"></div>
+</section>
 
 <!-- CHAT -->
-<div id="chat" class="hidden">
-  <h2>Chat</h2>
-  <div id="chatBox"></div>
-  <input id="chatMsg" placeholder="Message">
-  <button onclick="sendMsg()">Send</button>
-</div>
+<section id="chat" class="hidden">
+  <h2>Private Chat</h2>
+  <div id="messages"></div>
+  <input id="msgInput" placeholder="Type message">
+  <button onclick="sendMessage()">Send</button>
+</section>
 
 <!-- ADMIN -->
-<div id="admin" class="hidden">
-  <h2>Admin Dashboard</h2>
-
-  <h3>Pending Listings</h3>
-  <div id="adminListings"></div>
-
-  <h3>Escrows</h3>
-  <div id="adminEscrows"></div>
-
-  <h3>Users</h3>
+<section id="admin" class="hidden">
+  <h2>Admin Panel</h2>
+  <h3>Seller Verification</h3>
   <div id="adminUsers"></div>
-</div>
+  <h3>Orders (Spy Chat)</h3>
+  <div id="adminOrders"></div>
+</section>
 
 </div>
+
+<footer>
+  <a href="terms.html">Terms</a> |
+  <a href="risk.html">Risk</a> |
+  <a href="payment.html">Payment</a>
+</footer>
 
 <script src="script.js"></script>
 </body>
