@@ -6,66 +6,64 @@ firebase.initializeApp({
   storageBucket: "gamevaultmarket-5e494.appspot.com"
 });
 
-const auth = firebase.auth();
+const firebaseAuth = firebase.auth();
 const db = firebase.firestore();
 
 let currentOrder = null;
 
 // AUTH
 function signup() {
-  auth.createUserWithEmailAndPassword(email.value, password.value)
-    .then(r => db.collection("users").doc(r.user.uid).set({
-      role: role.value,
-      verified:false,
-      created:new Date()
-    }));
+  firebaseAuth.createUserWithEmailAndPassword(email.value, password.value)
+    .then(r => {
+      return db.collection("users").doc(r.user.uid).set({
+        role: role.value,
+        verified: false,
+        created: new Date()
+      });
+    })
+    .catch(err => alert(err.message));
 }
 
 function login() {
-  auth.signInWithEmailAndPassword(email.value, password.value);
+  firebaseAuth.signInWithEmailAndPassword(email.value, password.value)
+    .catch(err => alert(err.message));
 }
 
-function logout() { auth.signOut(); }
+function logout() {
+  firebaseAuth.signOut();
+}
 
-auth.onAuthStateChanged(u => {
-  if (!u) return;
-  auth.style.display="none";
-  nav.classList.remove("hidden");
+// SINGLE AUTH LISTENER (ONLY ONE)
+firebaseAuth.onAuthStateChanged(user => {
+  if (!user) return;
+
+  document.getElementById("auth").classList.add("hidden");
+  document.getElementById("nav").classList.remove("hidden");
+
   show("risk");
 });
 
 // NAV
 function show(id) {
-  document.querySelectorAll("section").forEach(s=>s.classList.add("hidden"));
+  document.querySelectorAll("section").forEach(s => s.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
 }
 
 // RISK
-function acceptRisk() { show("home"); loadListings(); }
-
-// LISTINGS
-function loadListings() {
-  db.collection("listings").where("status","==","approved")
-  .onSnapshot(s=>{
-    listings.innerHTML="";
-    s.forEach(d=>{
-      listings.innerHTML+=`
-        <div class="card">
-          <b>${d.data().game}</b> - $${d.data().price}
-          <button onclick="buy('${d.id}')">Buy</button>
-        </div>`;
-    });
-  });
+function acceptRisk() {
+  show("home");
+  loadListings();
 }
 
 // BUY FLOW
 function buy(listingId) {
   db.collection("orders").add({
     listingId,
-    buyer: auth.currentUser.uid,
-    status:"waiting_platform_fee",
-    created:new Date()
+    buyer: firebaseAuth.currentUser.uid,
+    status: "waiting_platform_fee",
+    created: new Date()
   });
+
   alert("Pay platform fee first. Chat locked.");
 }
 
@@ -73,23 +71,27 @@ function buy(listingId) {
 function openChat(orderId) {
   currentOrder = orderId;
   show("chat");
-  db.collection("chats").doc(orderId).collection("messages")
+
+  db.collection("chats").doc(orderId)
+    .collection("messages")
     .orderBy("time")
-    .onSnapshot(s=>{
-      messages.innerHTML="";
-      s.forEach(m=>{
-        messages.innerHTML+=`<p>${m.data().text}</p>`;
+    .onSnapshot(s => {
+      messages.innerHTML = "";
+      s.forEach(m => {
+        messages.innerHTML += `<p>${m.data().text}</p>`;
       });
     });
 }
 
 function sendMessage() {
   if (!currentOrder) return;
+
   db.collection("chats").doc(currentOrder)
     .collection("messages").add({
       text: msgInput.value,
-      sender: auth.currentUser.uid,
-      time:new Date()
+      sender: firebaseAuth.currentUser.uid,
+      time: new Date()
     });
-  msgInput.value="";
+
+  msgInput.value = "";
 }
