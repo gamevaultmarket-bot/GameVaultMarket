@@ -34,14 +34,27 @@ function logout() {
 }
 
 // SINGLE AUTH LISTENER (ONLY ONE)
-firebaseAuth.onAuthStateChanged(user => {
+firebaseAuth.onAuthStateChanged(async user => {
   if (!user) return;
 
   document.getElementById("auth").classList.add("hidden");
   document.getElementById("nav").classList.remove("hidden");
 
+  const snap = await db.collection("users").doc(user.uid).get();
+  const data = snap.data();
+
+  // SELLER NOT VERIFIED → FORCE VERIFICATION
+  if (data.role === "seller" && data.verified === false) {
+    show("verification");
+    return;
+  }
+
+  // EVERYONE ELSE
   show("risk");
 });
+if (data.role === "seller" && data.verified === true) {
+  document.getElementById("sellBtn").classList.remove("hidden");
+}
 
 // NAV
 function show(id) {
