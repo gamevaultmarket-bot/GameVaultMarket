@@ -1,4 +1,6 @@
-// FIREBASE INIT
+/***********************
+ * FIREBASE INIT
+ ***********************/
 firebase.initializeApp({
   apiKey: "AIzaSyBfGXL6lKmBTZ9FIxsmsP_-40_-MZ33zBw",
   authDomain: "gamevaultmarket-5e494.firebaseapp.com",
@@ -8,11 +10,20 @@ firebase.initializeApp({
 
 const auth = firebase.auth();
 const db = firebase.firestore();
-const storage = firebase.storage();
 
-let currentOrder = null;
+/***********************
+ * DOM ELEMENTS
+ ***********************/
+const authSection = document.getElementById("auth");
+const nav = document.getElementById("nav");
+const sellBtn = document.getElementById("sellBtn");
+const adminBtn = document.getElementById("adminBtn");
+const adminUsers = document.getElementById("adminUsers");
+const adminOrders = document.getElementById("adminOrders");
 
-// AUTH
+/***********************
+ * AUTH
+ ***********************/
 function signup() {
   auth.createUserWithEmailAndPassword(email.value, password.value)
     .then(res => {
@@ -20,190 +31,111 @@ function signup() {
         email: email.value,
         role: role.value,
         verified: false,
-        created: new Date()
+        created: firebase.firestore.FieldValue.serverTimestamp()
       });
     })
-    .catch(e => alert(e.message));
+    .catch(err => alert(err.message));
 }
 
 function login() {
   auth.signInWithEmailAndPassword(email.value, password.value)
-    .catch(e => alert(e.message));
+    .catch(err => alert(err.message));
 }
 
 function logout() {
   auth.signOut();
 }
 
-// AUTH STATE
+/***********************
+ * AUTH STATE (ONLY ONE)
+ ***********************/
 auth.onAuthStateChanged(async user => {
-  if (!user) return;
+  if (!user) {
+    authSection.classList.remove("hidden");
+    nav.classList.add("hidden");
+    return;
+  }
 
-  authDivHide();
+  authSection.classList.add("hidden");
   nav.classList.remove("hidden");
 
-  const snap = await db.collection("users").doc(user.uid).get();
-  const data = snap.data();
-
+  // reset buttons
   sellBtn.classList.add("hidden");
   adminBtn.classList.add("hidden");
 
+  const snap = await db.collection("users").doc(user.uid).get();
+  if (!snap.exists) return;
+
+  const data = snap.data();
+
+  // ✅ ADMIN
   if (data.role === "admin") {
     adminBtn.classList.remove("hidden");
     show("admin");
-    loadAdmin();
+    loadAdminPanel();
     return;
   }
 
-  if (data.role === "seller" && !data.verified) {
-    show("verification");
+  // SELLER (NOT VERIFIED)
+  if (data.role === "seller" && data.verified === false) {
+    show("risk");
     return;
   }
 
-  if (data.role === "seller" && data.verified) {
+  // SELLER (VERIFIED)
+  if (data.role === "seller" && data.verified === true) {
     sellBtn.classList.remove("hidden");
   }
 
+  // BUYER
   show("home");
-  loadListings();
 });
 
-// UI HELPERS
+/***********************
+ * NAV
+ ***********************/
 function show(id) {
   document.querySelectorAll("section").forEach(s => s.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
 }
 
-function authDivHide() {
-  document.getElementById("auth").classList.add("hidden");
-}
-
-// VERIFICATION
-async function submitVerification() {
-  const uid = auth.currentUser.uid;
-
-  async function upload(file, path) {
-    const ref = storage.ref(path);
-    await ref.put(file);
-    return ref.getDownloadURL();
-  }
-
-  const idUrl = await upload(idFile.files[0], `verifications/${uid}/id`);
-  const selfieUrl = await upload(selfieFile.files[0], `verifications/${uid}/selfie`);
-  const paymentUrl = await upload(paymentFile.files[0], `verifications/${uid}/payment`);
-
-  const gameUrls = [];
-  for (let f of gameFiles.files) {
-    gameUrls.push(await upload(f, `verifications/${uid}/game_${f.name}`));
-  }
-
-  await db.collection("verifications").doc(uid).set({
-    idUrl,
-    selfieUrl,
-    paymentUrl,
-    gameUrls,
-    status: "pending",
-    created: new Date()
-  });
-
-  alert("Verification submitted. Await admin approval.");
-}
-
-// LISTINGS
-function loadListings() {
-  db.collection("listings").where("status", "==", "approved")
+/***********************
+ * ADMIN PANEL
+ ***********************/
+function loadAdminPanel() {
+  // Sellers
+  db.collection("users")
+    .where("role", "==", "seller")
     .onSnapshot(snap => {
-      listings.innerHTML = "";
+      adminUsers.innerHTML = "";
       snap.forEach(doc => {
-        const d = doc.data();
-        listings.innerHTML += `
+        const u = doc.data();
+        adminUsers.innerHTML += `
           <div class="card">
-            <b>${d.game}</b> - $${d.price}
-            <button onclick="buy('${doc.id}')">Buy</button>
+            ${u.email || doc.id}<br>
+            Verified: ${u.verified ? "✅" : "❌"}
+            <br>
+            <button onclick="verifySeller('${doc.id}')">Verify</button>
           </div>
         `;
       });
     });
-}
 
-async function createListing() {
-  const uid = auth.currentUser.uid;
-  const file = screenshot.files[0];
-  const ref = storage.ref(`listings/${Date.now()}_${file.name}`);
-  await ref.put(file);
-  const url = await ref.getDownloadURL();
-
-  await db.collection("listings").add({
-    game: game.value,
-    details: details.value,
-    price: price.value,
-    screenshot: url,
-    seller: uid,
-    status: "pending",
-    created: new Date()
-  });
-
-  alert("Listing submitted for approval");
-}
-
-// BUY + CHAT
-async function buy(listingId) {
-  const listing = await db.collection("listings").doc(listingId).get();
-  const seller = listing.data().seller;
-
-  const order = await db.collection("orders").add({
-    listingId,
-    buyer: auth.currentUser.uid,
-    seller,
-    status: "waiting_platform_fee",
-    created: new Date()
-  });
-
-  openChat(order.id);
-}
-
-function openChat(orderId) {
-  currentOrder = orderId;
-  show("chat");
-
-  db.collection("chats").doc(orderId).collection("messages")
-    .orderBy("time")
-    .onSnapshot(snap => {
-      messages.innerHTML = "";
-      snap.forEach(m => {
-        messages.innerHTML += `<p>${m.data().text}</p>`;
-      });
+  // Orders
+  db.collection("orders").onSnapshot(snap => {
+    adminOrders.innerHTML = "";
+    snap.forEach(doc => {
+      adminOrders.innerHTML += `
+        <div class="card">
+          Order ID: ${doc.id}<br>
+          Status: ${doc.data().status}
+        </div>
+      `;
     });
-}
-
-function sendMessage() {
-  if (!currentOrder) return;
-  db.collection("chats").doc(currentOrder).collection("messages").add({
-    sender: auth.currentUser.uid,
-    text: msgInput.value,
-    time: new Date()
   });
-  msgInput.value = "";
 }
 
-// ADMIN
-function loadAdmin() {
-  db.collection("verifications").where("status", "==", "pending")
-    .onSnapshot(snap => {
-      adminVerifications.innerHTML = "";
-      snap.forEach(doc => {
-        adminVerifications.innerHTML += `
-          <div class="card">
-            Seller: ${doc.id}
-            <button onclick="approveSeller('${doc.id}')">Approve</button>
-          </div>
-        `;
-      });
-    });
-}
-
-async function approveSeller(uid) {
-  await db.collection("users").doc(uid).update({ verified: true });
-  await db.collection("verifications").doc(uid).update({ status: "approved" });
-  alert("Seller approved");
+function verifySeller(uid) {
+  db.collection("users").doc(uid).update({ verified: true });
+  alert("Seller verified");
 }
