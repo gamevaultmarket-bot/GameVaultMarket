@@ -5,7 +5,7 @@
   <title>GameVault Market</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Firebase -->
+  <!-- Firebase compat -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -22,9 +22,9 @@
 
 <nav id="nav" class="hidden">
   <button onclick="show('home')">Home</button>
-  <button onclick="show('sell')" id="sellBtn" class="hidden">Sell</button>
+  <button id="sellBtn" class="hidden" onclick="show('sell')">Sell</button>
   <button onclick="show('orders')">Orders</button>
-  <button onclick="show('admin')" id="adminBtn" class="hidden">Admin</button>
+  <button id="adminBtn" class="hidden" onclick="show('admin')">Admin</button>
   <button onclick="logout()">Logout</button>
 </nav>
 
@@ -38,19 +38,37 @@
 
   <select id="role">
     <option value="buyer">Buyer</option>
-    <option value="seller">Seller (Paid Verification)</option>
+    <option value="seller">Seller ($3 Verification Required)</option>
   </select>
 
   <button onclick="signup()">Sign Up</button>
   <button onclick="login()">Login</button>
 </section>
 
-<!-- RISK -->
-<section id="risk" class="card hidden">
-  <h3>⚠️ Risk Notice</h3>
-  <p>GameVault does not hold funds or act as escrow.</p>
-  <label><input type="checkbox" id="agreeRisk"> I understand</label>
-  <button onclick="acceptRisk()">Continue</button>
+<!-- VERIFICATION -->
+<section id="verification" class="hidden card">
+  <h2>Seller Verification ($3)</h2>
+  <p>You must complete verification before selling.</p>
+
+  <label>ID Card</label>
+  <input type="file" id="idFile">
+
+  <label>Selfie</label>
+  <input type="file" id="selfieFile">
+
+  <label>Game Account Screenshots</label>
+  <input type="file" id="gameFiles" multiple>
+
+  <label>Payment Proof ($3)</label>
+  <input type="file" id="paymentFile">
+
+  <p>
+    Pay $3 via:
+    <br>Skrill: <b>gamevaultmarket@gmail.com</b>
+    <br>USDT (ERC20): <b>0x992d0E36A7409F0c9228B51C6bB8F875b1A4Af3B</b>
+  </p>
+
+  <button onclick="submitVerification()">Submit Verification</button>
 </section>
 
 <!-- HOME -->
@@ -62,11 +80,11 @@
 <!-- SELL -->
 <section id="sell" class="hidden">
   <h2>Create Listing</h2>
-  <input id="game" placeholder="Game name">
+  <input id="game" placeholder="Game Name">
   <textarea id="details" placeholder="Account details"></textarea>
   <input id="price" placeholder="Price USD">
   <input type="file" id="screenshot">
-  <button onclick="createListing()">Submit</button>
+  <button onclick="createListing()">Post Listing</button>
 </section>
 
 <!-- ORDERS -->
@@ -79,16 +97,18 @@
 <section id="chat" class="hidden">
   <h2>Private Chat</h2>
   <div id="messages"></div>
-  <input id="msgInput" placeholder="Type message">
+  <input id="msgInput" placeholder="Message">
   <button onclick="sendMessage()">Send</button>
 </section>
 
 <!-- ADMIN -->
 <section id="admin" class="hidden">
   <h2>Admin Panel</h2>
-  <h3>Seller Verification</h3>
-  <div id="adminUsers"></div>
-  <h3>Orders (Spy Chat)</h3>
+
+  <h3>Seller Verifications</h3>
+  <div id="adminVerifications"></div>
+
+  <h3>Orders (Chat Spy)</h3>
   <div id="adminOrders"></div>
 </section>
 
