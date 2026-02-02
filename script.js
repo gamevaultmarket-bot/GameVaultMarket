@@ -1,13 +1,11 @@
 firebase.initializeApp({
   apiKey: "AIzaSyBfGXL6lKmBTZ9FIxsmsP_-40_-MZ33zBw",
   authDomain: "gamevaultmarket-5e494.firebaseapp.com",
-  projectId: "gamevaultmarket-5e494",
-  storageBucket: "gamevaultmarket-5e494.appspot.com"
+  projectId: "gamevaultmarket-5e494"
 });
 
 const auth = firebase.auth();
 const db = firebase.firestore();
-const storage = firebase.storage();
 
 const PAYMENTS = {
   skrill: "gamevaultmarket@gmail.com",
@@ -42,7 +40,7 @@ function logout() {
 auth.onAuthStateChanged(async user => {
   if (!user) return;
 
-  document.getElementById("auth").classList.add("hidden");
+  authSection();
   nav.classList.remove("hidden");
 
   const snap = await db.collection("users").doc(user.uid).get();
@@ -59,12 +57,12 @@ auth.onAuthStateChanged(async user => {
   }
 
   if (data.role === "seller" && !data.verified) {
-    show("verification");
     paymentDetails.innerHTML = `
       Skrill: ${PAYMENTS.skrill}<br>
       USDT: ${PAYMENTS.usdt}<br>
       Grey ACH: ${PAYMENTS.grey}
     `;
+    show("verification");
     return;
   }
 
@@ -80,6 +78,10 @@ auth.onAuthStateChanged(async user => {
 });
 
 /* UI */
+function authSection() {
+  document.getElementById("auth").classList.add("hidden");
+}
+
 function show(id) {
   document.querySelectorAll("section").forEach(s => s.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
@@ -87,19 +89,32 @@ function show(id) {
 
 /* RISK */
 function acceptRisk() {
-  if (!agreeRisk.checked) return alert("Accept risk first");
+  if (!agreeRisk.checked) return alert("Accept risk");
   show("home");
   loadListings();
 }
 
 /* VERIFICATION */
 async function submitVerification() {
+  const idUrl = idPhotoUrl.value.trim();
+  const selfieUrl = selfiePhotoUrl.value.trim();
+
+  if (!idUrl || !selfieUrl) {
+    alert("Please provide both ID and Selfie image links");
+    return;
+  }
+
   const uid = auth.currentUser.uid;
+
   await db.collection("verifications").doc(uid).set({
+    seller: uid,
+    idPhotoUrl: idUrl,
+    selfiePhotoUrl: selfieUrl,
     status: "pending",
     created: new Date()
   });
-  alert("Verification submitted");
+
+  alert("Verification submitted. Await admin approval.");
 }
 
 /* PAYOUT */
@@ -119,11 +134,16 @@ function loadListings() {
   db.collection("listings").where("status","==","approved")
     .onSnapshot(snap => {
       listings.innerHTML = "";
-      snap.forEach(d => {
+      snap.forEach(doc => {
+        const d = doc.data();
+        const players = d.players?.map(p=>`<span class="tag">${p}</span>`).join(" ") || "";
+
         listings.innerHTML += `
           <div class="card">
-            <b>${d.data().game}</b> - $${d.data().price}
-            <button onclick="buy('${d.id}')">Buy</button>
+            <b>${d.game}</b> - $${d.price}<br>
+            ${players}<br>
+            ${d.screenshot ? `<img src="${d.screenshot}" style="max-width:100%">` : ""}
+            <br><button onclick="buy('${doc.id}')">Buy</button>
           </div>
         `;
       });
@@ -132,37 +152,44 @@ function loadListings() {
 
 /* SELL */
 function createListing() {
+  const list = parsePlayers(players.value);
+  if (!list) return;
+
   db.collection("listings").add({
     game: game.value,
     details: details.value,
-    price: price.value,
+    price: Number(price.value),
+    players: list,
+    screenshot: screenshotUrl.value || null,
     seller: auth.currentUser.uid,
-    status: "approved",
+    status: "pending",
     created: new Date()
   });
-  alert("Listing created");
+
+  alert("Listing submitted");
 }
 
 /* BUY */
-function buy(listingId) {
+function buy(id) {
   db.collection("orders").add({
-    listingId,
+    listingId: id,
     buyer: auth.currentUser.uid,
     status: "waiting_platform_fee",
     created: new Date()
   });
-  alert("Order created. Pay platform fee to unlock chat.");
+  alert("Order created");
 }
 
 /* CHAT */
 function openChat(orderId) {
   currentChat = orderId;
   show("chat");
+
   db.collection("chats").doc(orderId).collection("messages")
     .orderBy("time")
-    .onSnapshot(s => {
+    .onSnapshot(snap => {
       messages.innerHTML = "";
-      s.forEach(m => messages.innerHTML += `<p>${m.data().text}</p>`);
+      snap.forEach(m => messages.innerHTML += `<p>${m.data().text}</p>`);
     });
 }
 
@@ -180,30 +207,49 @@ function sendMessage() {
 function loadAdmin() {
   db.collection("verifications").onSnapshot(snap => {
     adminUsers.innerHTML = "";
+
     snap.forEach(doc => {
+      const v = doc.data();
+
       adminUsers.innerHTML += `
         <div class="card">
-          Seller: ${doc.id}
-          <button onclick="approveSeller('${doc.id}')">Approve</button>
-        </div>
-      `;
-    });
-  });
+          <b>Seller UID:</b> ${doc.id}<br><br>
 
-  db.collection("orders").onSnapshot(snap => {
-    adminOrders.innerHTML = "";
-    snap.forEach(doc => {
-      adminOrders.innerHTML += `
-        <div class="card">
-          Order: ${doc.id} | ${doc.data().status}
+          <a href="${v.idPhotoUrl}" target="_blank">🪪 View ID Photo</a><br>
+          <a href="${v.selfiePhotoUrl}" target="_blank">🤳 View Selfie</a><br><br>
+
+          Status: ${v.status}<br><br>
+
+          <button onclick="approveSeller('${doc.id}')">Approve Seller</button>
         </div>
       `;
     });
   });
 }
 
-function approveSeller(uid) {
-  db.collection("users").doc(uid).update({ verified: true });
-  db.collection("verifications").doc(uid).update({ status: "approved" });
-  alert("Seller verified");
+async function approveSeller(uid) {
+  try {
+    await db.collection("users").doc(uid).update({
+      verified: true
+    });
+
+    await db.collection("verifications").doc(uid).update({
+      status: "approved",
+      approvedAt: new Date()
+    });
+
+    alert("Seller verified successfully");
+  } catch (err) {
+    alert("Error verifying seller: " + err.message);
+  }
+}
+
+/* HELPERS */
+function parsePlayers(text) {
+  const arr = text.split(",").map(p=>p.trim()).filter(Boolean);
+  if (arr.length > 12) {
+    alert("Max 12 players");
+    return null;
+  }
+  return arr;
 }

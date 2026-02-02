@@ -26,8 +26,39 @@ button {
   color:white;
 }
 
-.container { max-width:900px; margin:auto; padding:15px; }
+.container {
+  max-width:900px;
+  margin:auto;
+  padding:15px;
+}
+
 .hidden { display:none; }
-.card { background:#fff1; padding:15px; border-radius:8px; margin-bottom:10px; }
-input, textarea, select { width:100%; padding:8px; margin:5px 0; }
-#messages { height:300px; overflow:auto; background:#0004; padding:10px; }
+
+.card {
+  background:#fff1;
+  padding:15px;
+  border-radius:8px;
+  margin-bottom:10px;
+}
+
+input, textarea, select {
+  width:100%;
+  padding:8px;
+  margin:5px 0;
+}
+
+#messages {
+  height:300px;
+  overflow:auto;
+  background:#0004;
+  padding:10px;
+}
+
+.tag {
+  background:#1e90ff;
+  padding:4px 8px;
+  border-radius:10px;
+  margin:3px;
+  display:inline-block;
+  font-size:12px;
+}

@@ -9,7 +9,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <link rel="stylesheet" href="style.css">
 </head>
@@ -22,9 +21,9 @@
 
 <nav id="nav" class="hidden">
   <button onclick="show('home')">Home</button>
-  <button onclick="show('sell')" id="sellBtn" class="hidden">Sell</button>
+  <button id="sellBtn" class="hidden" onclick="show('sell')">Sell</button>
   <button onclick="show('orders')">Orders</button>
-  <button onclick="show('admin')" id="adminBtn" class="hidden">Admin</button>
+  <button id="adminBtn" class="hidden" onclick="show('admin')">Admin</button>
   <button onclick="logout()">Logout</button>
 </nav>
 
@@ -35,10 +34,12 @@
   <h2>Login / Register</h2>
   <input id="email" placeholder="Email">
   <input id="password" type="password" placeholder="Password">
+
   <select id="role">
     <option value="buyer">Buyer</option>
     <option value="seller">Seller</option>
   </select>
+
   <button onclick="signup()">Sign Up</button>
   <button onclick="login()">Login</button>
 </section>
@@ -46,7 +47,7 @@
 <!-- RISK -->
 <section id="risk" class="card hidden">
   <h3>⚠️ Risk Notice</h3>
-  <p>GameVault is a P2P marketplace. We do not hold funds or act as escrow.</p>
+  <p>This is a P2P marketplace. GameVault does not hold funds.</p>
   <label><input type="checkbox" id="agreeRisk"> I understand</label>
   <button onclick="acceptRisk()">Continue</button>
 </section>
@@ -54,9 +55,15 @@
 <!-- VERIFICATION -->
 <section id="verification" class="card hidden">
   <h3>Seller Verification ($3)</h3>
-  <input type="file" id="idImage">
-  <input type="file" id="selfieImage">
+
+  <label>ID Card / Passport Photo (URL)</label>
+  <input id="idPhotoUrl" placeholder="Paste image link (Imgur, Postimg...)">
+
+  <label>Selfie holding ID (URL)</label>
+  <input id="selfiePhotoUrl" placeholder="Paste image link">
+
   <div id="paymentDetails"></div>
+
   <button onclick="submitVerification()">Submit Verification</button>
 </section>
 
@@ -64,11 +71,11 @@
 <section id="payout" class="card hidden">
   <h3>Set Payout Method</h3>
   <select id="payoutMethod">
-    <option value="">Select method</option>
-    <option value="Skrill">Skrill</option>
-    <option value="USDT">USDT</option>
-    <option value="PayPal">PayPal</option>
-    <option value="Grey">Grey ACH</option>
+    <option value="">Select</option>
+    <option>Skrill</option>
+    <option>USDT</option>
+    <option>PayPal</option>
+    <option>Grey ACH</option>
   </select>
   <input id="payoutAddress" placeholder="Email / Wallet / Account">
   <button onclick="savePayout()">Save</button>
@@ -86,6 +93,11 @@
   <input id="game" placeholder="Game name">
   <textarea id="details" placeholder="Account details"></textarea>
   <input id="price" placeholder="Price USD">
+
+  <input id="players" placeholder="High-rated players (max 12)">
+  <small>Example: Mbappé (91), Haaland (91)</small>
+
+  <input id="screenshotUrl" placeholder="Screenshot image URL">
   <button onclick="createListing()">Submit</button>
 </section>
 
@@ -99,16 +111,16 @@
 <section id="chat" class="hidden">
   <h2>Private Chat</h2>
   <div id="messages"></div>
-  <input id="msgInput" placeholder="Type message">
+  <input id="msgInput" placeholder="Message">
   <button onclick="sendMessage()">Send</button>
 </section>
 
 <!-- ADMIN -->
 <section id="admin" class="hidden">
   <h2>Admin Panel</h2>
-  <h3>Seller Verification</h3>
+  <h3>Seller Verifications</h3>
   <div id="adminUsers"></div>
-  <h3>Orders & Chats</h3>
+  <h3>Orders</h3>
   <div id="adminOrders"></div>
 </section>
 
