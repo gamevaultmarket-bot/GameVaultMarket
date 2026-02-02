@@ -33,22 +33,35 @@ function login() {
 }
 
 function logout() {
-  auth.signOut();
+  auth.signOut()
+    .then(() => {
+      // Reset UI to login page
+      document.getElementById("auth").classList.remove("hidden");
+      nav.classList.add("hidden");
+      show("auth"); // show login/signup section
+    })
+    .catch(err => alert(err.message));
 }
 
 /* AUTH STATE */
 auth.onAuthStateChanged(async user => {
   if (!user) return;
 
-  authSection();
+  // Hide login/signup section
+  document.getElementById("auth").classList.add("hidden");
   nav.classList.remove("hidden");
 
+  // Fetch user data
   const snap = await db.collection("users").doc(user.uid).get();
+  if (!snap.exists) return;
+
   const data = snap.data();
 
+  // Reset buttons
   sellBtn.classList.add("hidden");
   adminBtn.classList.add("hidden");
 
+  // Admin
   if (data.role === "admin") {
     adminBtn.classList.remove("hidden");
     show("admin");
@@ -56,24 +69,27 @@ auth.onAuthStateChanged(async user => {
     return;
   }
 
+  // Seller not verified
   if (data.role === "seller" && !data.verified) {
+    show("verification");
     paymentDetails.innerHTML = `
       Skrill: ${PAYMENTS.skrill}<br>
       USDT: ${PAYMENTS.usdt}<br>
       Grey ACH: ${PAYMENTS.grey}
     `;
-    show("verification");
     return;
   }
 
-  if (data.role === "seller" && data.verified) {
-    if (!data.payout) {
-      show("payout");
-      return;
-    }
-    sellBtn.classList.remove("hidden");
+  // Seller verified but payout missing
+  if (data.role === "seller" && data.verified && !data.payout) {
+    show("payout");
+    return;
   }
 
+  // Verified seller or buyer
+  if (data.role === "seller" && data.verified) sellBtn.classList.remove("hidden");
+
+  // Finally, show risk page
   show("risk");
 });
 
