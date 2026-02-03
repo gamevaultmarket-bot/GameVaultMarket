@@ -45,7 +45,11 @@ function logout() {
 
 /* AUTH STATE */
 auth.onAuthStateChanged(async user => {
-  if (!user) return;
+  if (!user) {
+  nav.classList.add("hidden");
+  show("auth");
+  return;
+}
 
   // Hide login/signup section
   document.getElementById("auth").classList.add("hidden");
@@ -165,6 +169,17 @@ function loadListings() {
       });
     });
 }
+async function approveListing(id) {
+  try {
+    await db.collection("listings").doc(id).update({
+      status: "approved",
+      approvedAt: new Date()
+    });
+    alert("Listing approved");
+  } catch (e) {
+    alert(e.message);
+  }
+}
 
 /* SELL */
 function createListing() {
@@ -221,8 +236,19 @@ function sendMessage() {
 
 /* ADMIN */
 function loadAdmin() {
-  db.collection("verifications").onSnapshot(snap => {
+
+  /* ===============================
+     SELLER VERIFICATIONS
+  ================================ */
+db.collection("verifications")
+  .where("status", "==", "pending")
+  .onSnapshot(snap => {
     adminUsers.innerHTML = "";
+
+    if (snap.empty) {
+      adminUsers.innerHTML = "<p>No seller verifications</p>";
+      return;
+    }
 
     snap.forEach(doc => {
       const v = doc.data();
@@ -234,15 +260,50 @@ function loadAdmin() {
           <a href="${v.idPhotoUrl}" target="_blank">🪪 View ID Photo</a><br>
           <a href="${v.selfiePhotoUrl}" target="_blank">🤳 View Selfie</a><br><br>
 
-          Status: ${v.status}<br><br>
+          <b>Status:</b> ${v.status}<br><br>
 
-          <button onclick="approveSeller('${doc.id}')">Approve Seller</button>
+          ${
+            v.status === "approved"
+              ? `<span style="color:lightgreen">✔ Approved</span>`
+              : `<button onclick="approveSeller('${doc.id}')">Approve Seller</button>`
+          }
         </div>
       `;
     });
   });
-}
 
+
+  /* ===============================
+     PENDING LISTINGS
+  ================================ */
+  db.collection("listings")
+    .where("status", "==", "pending")
+    .onSnapshot(snap => {
+
+      adminOrders.innerHTML = "<h3>Pending Listings</h3>";
+
+      if (snap.empty) {
+        adminOrders.innerHTML += "<p>No pending listings</p>";
+        return;
+      }
+
+      snap.forEach(doc => {
+        const d = doc.data();
+
+        adminOrders.innerHTML += `
+          <div class="card">
+            <b>${d.game}</b> - $${d.price}<br><br>
+            <b>Seller:</b> ${d.seller}<br><br>
+
+            <button onclick="approveListing('${doc.id}')">
+              Approve Listing
+            </button>
+          </div>
+        `;
+      });
+    });
+
+}
 async function approveSeller(uid) {
   try {
     await db.collection("users").doc(uid).update({
@@ -259,6 +320,7 @@ async function approveSeller(uid) {
     alert("Error verifying seller: " + err.message);
   }
 }
+
 
 /* HELPERS */
 function parsePlayers(text) {
