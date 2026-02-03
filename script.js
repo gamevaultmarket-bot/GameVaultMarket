@@ -151,7 +151,7 @@ async function savePayout() {
 
 /* LISTINGS */
 function loadListings() {
-  db.collection("listings").where("status","==","approved")
+  db.collection("listings").where("status","==","active")
     .onSnapshot(snap => {
       listings.innerHTML = "";
       snap.forEach(doc => {
@@ -169,13 +169,13 @@ function loadListings() {
       });
     });
 }
-async function approveListing(id) {
+async function activeListing(id) {
   try {
-    await db.collection("listings").doc(id).update({
-      status: "approved",
+    db.collection("listings").doc(id).update({
+      status: "active",
       approvedAt: new Date()
     });
-    alert("Listing approved");
+    alert("Listing active");
   } catch (e) {
     alert(e.message);
   }
@@ -193,7 +193,7 @@ function createListing() {
     players: list,
     screenshot: screenshotUrl.value || null,
     seller: auth.currentUser.uid,
-    status: "pending",
+    status: "active",
     created: new Date()
   });
 
@@ -272,37 +272,46 @@ db.collection("verifications")
     });
   });
 
-
   /* ===============================
-     PENDING LISTINGS
+     Active LISTINGS
   ================================ */
   db.collection("listings")
-    .where("status", "==", "pending")
-    .onSnapshot(snap => {
+  .onSnapshot(snap => {
+    adminOrders.innerHTML = "<h3>All Listings</h3>";
 
-      adminOrders.innerHTML = "<h3>Pending Listings</h3>";
+    if (snap.empty) {
+      adminOrders.innerHTML += "<p>No listings</p>";
+      return;
+    }
 
-      if (snap.empty) {
-        adminOrders.innerHTML += "<p>No pending listings</p>";
-        return;
-      }
+    snap.forEach(doc => {
+      const d = doc.data();
 
-      snap.forEach(doc => {
-        const d = doc.data();
+      adminOrders.innerHTML += `
+        <div class="card">
+          <b>${d.game}</b><br>
+          Price: $${d.price}<br>
+          Seller: ${d.seller}<br>
+          Status: ${d.status}<br><br>
 
-        adminOrders.innerHTML += `
-          <div class="card">
-            <b>${d.game}</b> - $${d.price}<br><br>
-            <b>Seller:</b> ${d.seller}<br><br>
-
-            <button onclick="approveListing('${doc.id}')">
-              Approve Listing
-            </button>
-          </div>
-        `;
-      });
+          <button onclick="removeListing('${doc.id}')">
+            ❌ Remove Listing
+          </button>
+        </div>
+      `;
     });
+  });
 
+}
+async function removeListing(id) {
+  if (!confirm("Remove this listing from buyers?")) return;
+
+  await db.collection("listings").doc(id).update({
+    status: "removed",
+    removedAt: new Date()
+  });
+
+  alert("Listing removed");
 }
 async function approveSeller(uid) {
   try {
