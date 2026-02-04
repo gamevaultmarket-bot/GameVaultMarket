@@ -193,11 +193,11 @@ function createListing() {
     players: list,
     screenshot: screenshotUrl.value || null,
     seller: auth.currentUser.uid,
-    status: "active",
+    status: "active",   // ✅ COMMA FIXED
     created: new Date()
-  });
-
-  alert("Listing submitted");
+  })
+  .then(() => alert("Listing submitted"))
+  .catch(err => alert("Error: " + err.message));
 }
 
 /* BUY */
