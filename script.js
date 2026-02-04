@@ -210,6 +210,36 @@ function buy(id) {
   });
   alert("Order created");
 }
+function loadOrders() {
+  const uid = auth.currentUser.uid;
+
+  db.collection("orders")
+    .where("buyer", "==", uid)
+    .onSnapshot(snap => {
+      orders.innerHTML = "<h3>My Orders</h3>";
+
+      if (snap.empty) {
+        orders.innerHTML += "<p>No orders yet</p>";
+        return;
+      }
+
+      snap.forEach(doc => {
+        const o = doc.data();
+
+        orders.innerHTML += `
+          <div class="card">
+            <b>Order ID:</b> ${doc.id}<br>
+            Status: ${o.status}<br>
+            Created: ${o.created?.toDate().toLocaleString() || ""}
+          </div>
+        `;
+      });
+    });
+}
+function openOrders() {
+  show("orders");
+  loadOrders();
+}
 
 /* CHAT */
 function openChat(orderId) {
