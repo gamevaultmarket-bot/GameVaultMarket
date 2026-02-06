@@ -187,17 +187,31 @@ function createListing() {
   const list = parsePlayers(players.value);
   if (!list) return;
 
+  const priceNum = parseFloat(price.value);
+
+  // ❌ Prevent empty / invalid price
+  if (isNaN(priceNum) || priceNum <= 0) {
+    alert("Enter a valid price");
+    return;
+  }
+
   db.collection("listings").add({
-    game: game.value,
-    details: details.value,
-    price: priceValue,
+    game: game.value.trim(),
+    details: details.value.trim(),
+    price: priceNum,              // ✅ always number now
     players: list,
-    screenshot: screenshotUrl.value || null,
+    screenshot: screenshotUrl.value.trim() || null,
     seller: auth.currentUser.uid,
-    status: "active",   // ✅ COMMA FIXED
+    status: "active",
     created: new Date()
   })
-  .then(() => alert("Listing submitted"))
+  .then(() => {
+    alert("Listing submitted");
+    price.value = "";     // reset
+    details.value = "";
+    players.value = "";
+    screenshotUrl.value = "";
+  })
   .catch(err => alert("Error: " + err.message));
 }
 
