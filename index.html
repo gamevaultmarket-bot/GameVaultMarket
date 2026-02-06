@@ -22,7 +22,7 @@
 <nav id="nav" class="hidden">
   <button onclick="show('home')">Home</button>
   <button id="sellBtn" class="hidden" onclick="show('sell')">Sell</button>
-  <button onclick="show('orders')">Orders</button>
+  <button onclick="openOrders()">Orders</button>
   <button id="adminBtn" class="hidden" onclick="show('admin')">Admin</button>
   <button onclick="logout()">Logout</button>
 </nav>
@@ -104,7 +104,7 @@
 <!-- ORDERS -->
 <section id="orders" class="hidden">
   <h2>My Orders</h2>
-  <div id="orderList"></div>
+  <div id="ordersList"></div>
 </section>
 
 <!-- CHAT -->
