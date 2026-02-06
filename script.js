@@ -6,6 +6,7 @@ firebase.initializeApp({
 
 const auth = firebase.auth();
 const db = firebase.firestore();
+const ordersList = document.getElementById("ordersList");
 
 const PAYMENTS = {
   skrill: "gamevaultmarket@gmail.com",
@@ -189,7 +190,7 @@ function createListing() {
   db.collection("listings").add({
     game: game.value,
     details: details.value,
-    price: Number(price.value),
+    price: priceValue,
     players: list,
     screenshot: screenshotUrl.value || null,
     seller: auth.currentUser.uid,
@@ -216,21 +217,22 @@ function loadOrders() {
   db.collection("orders")
     .where("buyer", "==", uid)
     .onSnapshot(snap => {
-      orders.innerHTML = "<h3>My Orders</h3>";
+      ordersList.innerHTML = "<h3>My Orders</h3>";
 
       if (snap.empty) {
-        orders.innerHTML += "<p>No orders yet</p>";
+        ordersList.innerHTML += "<p>No orders yet</p>";
         return;
       }
 
       snap.forEach(doc => {
         const o = doc.data();
 
-        orders.innerHTML += `
+        ordersList.innerHTML += `
           <div class="card">
             <b>Order ID:</b> ${doc.id}<br>
             Status: ${o.status}<br>
-            Created: ${o.created?.toDate().toLocaleString() || ""}
+            Created: ${o.created?.toDate().toLocaleString() || ""}<br><br>
+            <button onclick="openChat('${doc.id}')">Open Chat</button>
           </div>
         `;
       });
