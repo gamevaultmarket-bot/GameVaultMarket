@@ -130,12 +130,7 @@ auth.onAuthStateChanged(async user => {
   const snap = await db.collection("users").doc(user.uid).get();
 
 if (!snap.exists) {
-  await db.collection("users").doc(user.uid).set({
-    email: user.email,
-    role: "buyer",
-    verified: false,
-    created: new Date()
-  });
+  return; // DO NOT overwrite role created during signup
 }
 
   const data = snap.data() || {};
