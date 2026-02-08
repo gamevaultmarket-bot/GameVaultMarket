@@ -13,6 +13,23 @@ firebase.initializeApp({
 const auth = firebase.auth();
 const db = firebase.firestore();
 const ordersList = document.getElementById("ordersList");
+const email = document.getElementById("email");
+const password = document.getElementById("password");
+const role = document.getElementById("role");
+const nav = document.getElementById("nav");
+const sellBtn = document.getElementById("sellBtn");
+const adminBtn = document.getElementById("adminBtn");
+const paymentDetails = document.getElementById("paymentDetails");
+const listings = document.getElementById("listings");
+const agreeRisk = document.getElementById("agreeRisk");
+const game = document.getElementById("game");
+const details = document.getElementById("details");
+const price = document.getElementById("price");
+const players = document.getElementById("players");
+const messages = document.getElementById("messages");
+const msgInput = document.getElementById("msgInput");
+const payoutMethod = document.getElementById("payoutMethod");
+const payoutAddress = document.getElementById("payoutAddress");
 
 const PAYMENTS = {
   skrill: "gamevaultmarket@gmail.com",
@@ -25,35 +42,46 @@ let currentChat = null;
 /* AUTH */
 async function signup() {
   try {
-    const r = await auth.createUserWithEmailAndPassword(email.value, password.value);
+    if (await isSystemLocked()) {
+      alert("System temporarily locked for security");
+      return;
+    }
+    
+   if (password.value.length < 6) {
+  alert("Password must be at least 6 characters");
+  return;
+}
+    const r = await auth.createUserWithEmailAndPassword(
+      email.value.trim(),
+      password.value
+    );
+
     await securityHeartbeat(r.user.uid);
+
     await db.collection("users").doc(r.user.uid).set({
-      email: email.value,
-      role: role.value,
+      email: email.value.trim(),
+      role: role.value || "buyer",
       verified: false,
       verificationLocked: false,
       created: new Date()
     });
-const fingerprint = getDeviceFingerprint();
 
-if (await isSystemLocked()) {
-  alert("System temporarily locked for security");
-  return;
-}
-await db.collection("device_fingerprints").doc(r.user.uid).set({
-  fingerprint: fingerprint,
-  created: new Date()
-});
-    // Save IP for duplicate detection
+    const fingerprint = getDeviceFingerprint();
+
+    await db.collection("device_fingerprints").doc(r.user.uid).set({
+      fingerprint: fingerprint,
+      created: new Date()
+    });
+
     try {
       const res = await fetch("https://api.ipify.org?format=json");
-const ipData = await res.json();
+      const ipData = await res.json();
 
-await db.collection("user_security").doc(r.user.uid).set({
-  ip: ipData.ip,
-  created: new Date()
-});
-    } catch (e) {
+      await db.collection("user_security").doc(r.user.uid).set({
+        ip: ipData.ip,
+        created: new Date()
+      });
+    } catch {
       console.log("IP fetch failed");
     }
 
@@ -61,10 +89,18 @@ await db.collection("user_security").doc(r.user.uid).set({
     alert(e.message);
   }
 }
-
+    
 function login() {
-  auth.signInWithEmailAndPassword(email.value, password.value)
-    .catch(e => alert(e.message));
+  const e = email.value.trim();
+  const p = password.value;
+
+  if (!e || !p) {
+    alert("Enter email and password");
+    return;
+  }
+
+  auth.signInWithEmailAndPassword(e, p)
+    .catch(err => alert(err.message));
 }
 
 function logout() {
@@ -92,9 +128,17 @@ auth.onAuthStateChanged(async user => {
 
   // Fetch user data
   const snap = await db.collection("users").doc(user.uid).get();
-  if (!snap.exists) return;
 
-  const data = snap.data();
+if (!snap.exists) {
+  await db.collection("users").doc(user.uid).set({
+    email: user.email,
+    role: "buyer",
+    verified: false,
+    created: new Date()
+  });
+}
+
+  const data = snap.data() || {};
   await checkDuplicateAccount();
   await detectScamBehavior(user.uid);
   if (data.banned) {
@@ -273,7 +317,7 @@ function loadListings() {
       listings.innerHTML = "";
       snap.forEach(doc => {
         const d = doc.data();
-        const players = d.players?.map(p=>`<span class="tag">${p}</span>`).join(" ") || "";
+        const playersHTML = d.players?.map(p=>`<span class="tag">${p}</span>`).join(" ") || "";
 
         listings.innerHTML += `
           <div class="card">
@@ -310,6 +354,10 @@ if (uDoc.data()?.shadowBanned) return;
     alert("Enter valid price");
     return;
   }
+if (!game.value.trim()) {
+  alert("Enter game name");
+  return;
+}
 if (await isSystemLocked()) {
   alert("System temporarily locked for security");
   return;
@@ -327,7 +375,7 @@ if (await isSystemLocked()) {
     }
   }
 
-  db.collection("listings").add({
+  await db.collection("listings").add({
     game: game.value.trim(),
     details: details.value.trim(),
     price: priceNum,
@@ -508,6 +556,13 @@ db.collection("verifications")
 async function removeListing(id) {
   if (!confirm("Remove this listing from buyers?")) return;
 
+  const docSnap = await db.collection("listings").doc(id).get();
+  const data = docSnap.data();
+
+  if (data?.screenshot) {
+    await deleteImageFromUrl(data.screenshot);
+  }
+
   await db.collection("listings").doc(id).update({
     status: "removed",
     removedAt: new Date()
@@ -555,8 +610,12 @@ function parsePlayers(text) {
 }
 
 async function isSystemLocked() {
-  const doc = await db.collection("system").doc("lockdown").get();
-  return doc.exists && doc.data()?.active === true;
+  try {
+    const doc = await db.collection("system").doc("lockdown").get();
+    return doc.exists && doc.data()?.active === true;
+  } catch {
+    return false;
+  }
 }
 function isValidImageLink(url) {
   if (!url) return false;
@@ -795,7 +854,8 @@ async function freezeOrder(orderId, reason="Suspicious activity") {
 function getDeviceFingerprint() {
   return btoa(
     navigator.userAgent +
-    (window.screen?.width || 0) + (window.screen?.height || 0)
+    (window.screen?.width || 0) +
+    (window.screen?.height || 0) +
     Intl.DateTimeFormat().resolvedOptions().timeZone
   );
 }
