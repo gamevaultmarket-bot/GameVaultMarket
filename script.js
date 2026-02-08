@@ -317,7 +317,7 @@ function loadListings() {
         listings.innerHTML += `
           <div class="card">
             <b>${d.game}</b> - $${Number(d.price || 0).toFixed(2)}<br>
-            ${players}<br>
+            ${playersHTML}<br>
             ${d.screenshot ? `<img src="${d.screenshot}" style="max-width:100%">` : ""}
             <br><button onclick="buy('${doc.id}')">Buy</button>
           </div>
