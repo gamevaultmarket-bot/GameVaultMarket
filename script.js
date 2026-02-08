@@ -26,7 +26,7 @@ let currentChat = null;
 async function signup() {
   try {
     const r = await auth.createUserWithEmailAndPassword(email.value, password.value);
-
+    await securityHeartbeat(r.user.uid);
     await db.collection("users").doc(r.user.uid).set({
       email: email.value,
       role: role.value,
@@ -34,7 +34,16 @@ async function signup() {
       verificationLocked: false,
       created: new Date()
     });
+const fingerprint = getDeviceFingerprint();
 
+if (await isSystemLocked()) {
+  alert("System temporarily locked for security");
+  return;
+}
+await db.collection("device_fingerprints").doc(r.user.uid).set({
+  fingerprint: fingerprint,
+  created: new Date()
+});
     // Save IP for duplicate detection
     try {
       const res = await fetch("https://api.ipify.org?format=json");
@@ -92,6 +101,12 @@ auth.onAuthStateChanged(async user => {
   alert("Account banned: " + (data.bannedReason || "Security violation"));
   await auth.signOut();
   return;
+}
+
+const fraudScore = await advancedFraudScan(user.uid);
+
+if (fraudScore >= 120) {
+  await shadowBan(user.uid);
 }
 
   // Reset buttons
@@ -181,7 +196,7 @@ async function submitVerification() {
     alert("Upload ALL 3 images");
     return;
   }
-  
+
   if (await isVerificationLocked()) {
   alert("Verification locked. You cannot edit or resubmit.");
   return;
@@ -191,12 +206,24 @@ async function submitVerification() {
   const idUrl = await uploadImage(idFile, "verification");
   const selfieUrl = await uploadImage(selfieFile, "verification");
   const paymentUrl = await uploadImage(paymentFile, "verification");
-
+if (
+  basicImageFraudCheck(idUrl) ||
+  basicImageFraudCheck(selfieUrl)
+) {
+  await db.collection("activity_logs").add({
+    uid: uid,
+    action: "fake_id_detected",
+    time: new Date()
+  });
+}
   if (!idUrl || !selfieUrl || !paymentUrl) {
     alert("Upload failed");
     return;
   }
-
+if (await isSystemLocked()) {
+  alert("System temporarily locked for security");
+  return;
+}
   await db.collection("verifications").doc(uid).set({
     seller: uid,
     idPhotoUrl: idUrl,
@@ -208,7 +235,12 @@ async function submitVerification() {
 await db.collection("users").doc(uid).update({
   verificationLocked: true
 });
-
+await db.collection("payment_links").add({
+  uid: uid,
+  wallet: PAYMENTS.usdt,
+  email: PAYMENTS.skrill,
+  time: new Date()
+});
   alert("Verification submitted — wait for admin approval");
 
   document.getElementById("idPhotoFile").value = "";
@@ -216,6 +248,11 @@ await db.collection("users").doc(uid).update({
   document.getElementById("paymentScreenshotFile").value = "";
 }
 
+function basicImageFraudCheck(url) {
+  const suspiciousWords = ["fake", "edit", "template", "sample"];
+  const lower = url.toLowerCase();
+  return suspiciousWords.some(w => lower.includes(w));
+}
 
 /* PAYOUT */
 async function savePayout() {
@@ -265,13 +302,18 @@ async function activeListing(id) {
 async function createListing() {
   const list = parsePlayers(players.value);
   if (!list) return;
-
+  
+  const uDoc = await db.collection("users").doc(auth.currentUser.uid).get();
+if (uDoc.data()?.shadowBanned) return;
   const priceNum = parseFloat(price.value);
   if (isNaN(priceNum) || priceNum <= 0) {
     alert("Enter valid price");
     return;
   }
-
+if (await isSystemLocked()) {
+  alert("System temporarily locked for security");
+  return;
+}
   const file = document.getElementById("listingScreenshotFile").files[0];
 
   let screenshotUrl = null;
@@ -305,18 +347,25 @@ async function createListing() {
   .catch(err => alert(err.message));
 }
 /* BUY */
-function buy(id) {
-  db.collection("orders").add({
+async function buy(id) {
+
+  if (await isSystemLocked()) {
+    alert("System temporarily locked for security");
+    return;
+  }
+
+  const uDoc = await db.collection("users").doc(auth.currentUser.uid).get();
+  if (uDoc.data()?.shadowBanned) return;
+
+  await db.collection("orders").add({
     listingId: id,
     buyer: auth.currentUser.uid,
     status: "waiting_platform_fee",
     created: new Date()
-  })
-  .then(() => {
-    alert("Order created");
-    openOrders(); // 🔥 auto open orders page
-  })
-  .catch(err => alert(err.message));
+  });
+
+  alert("Order created");
+  openOrders();
 }
 function loadOrders() {
   const uid = auth.currentUser.uid;
@@ -364,13 +413,21 @@ function openChat(orderId) {
     });
 }
 
-function sendMessage() {
+async function sendMessage() {
   if (!currentChat) return;
-  db.collection("chats").doc(currentChat).collection("messages").add({
+
+  const ok = await rateLimit(auth.currentUser.uid, "chat", 5, 10);
+  if (!ok) return alert("Slow down (spam protection)");
+
+  const uDoc = await db.collection("users").doc(auth.currentUser.uid).get();
+  if (uDoc.data()?.shadowBanned) return;
+
+  await db.collection("chats").doc(currentChat).collection("messages").add({
     sender: auth.currentUser.uid,
     text: msgInput.value,
     time: new Date()
   });
+
   msgInput.value = "";
 }
 
@@ -396,6 +453,9 @@ db.collection("verifications")
       adminUsers.innerHTML += `
         <div class="card">
           <b>Seller UID:</b> ${doc.id}<br><br>
+          
+<button onclick="banUser('${doc.id}')">🚫 Ban</button>
+<button onclick="unbanUser('${doc.id}')">♻ Unban</button>
 
           <a href="${v.idPhotoUrl}" target="_blank">🪪 View ID</a><br>
 <a href="${v.selfiePhotoUrl}" target="_blank">🤳 View Selfie Holding ID</a><br>
@@ -474,9 +534,10 @@ async function approveSeller(uid) {
 
 async function deleteImageFromUrl(url) {
   try {
-    const path = url.split("/storage/v1/object/public/images/")[1];
-    if (!path) return;
+    const parts = url.split("/object/public/images/");
+    if (parts.length < 2) return;
 
+    const path = parts[1];
     await supabaseClient.storage.from("images").remove([path]);
   } catch (e) {
     console.log("Delete failed", e);
@@ -493,6 +554,10 @@ function parsePlayers(text) {
   return arr;
 }
 
+async function isSystemLocked() {
+  const doc = await db.collection("system").doc("lockdown").get();
+  return doc.exists && doc.data()?.active === true;
+}
 function isValidImageLink(url) {
   if (!url) return false;
 
@@ -511,22 +576,43 @@ function isValidImageLink(url) {
   return true;
 }
 
-}/* ================= IMAGE UPLOAD ================= */
-
+/* ================= IMAGE UPLOAD ================= */
 async function uploadImage(file, folder="images") {
   if (!file.type.startsWith("image/")) {
     alert("Only real images allowed");
     return null;
   }
+  
+  const uDoc = await db.collection("users").doc(auth.currentUser.uid).get();
+if (uDoc.data()?.shadowBanned) return null;
 
   if (file.size > 5 * 1024 * 1024) {
     alert("Max 5MB");
     return null;
   }
+  
+  if (file.size < 1000) {
+  alert("Invalid image");
+  return null;
+}
+  if (await isSystemLocked()) {
+  alert("System temporarily locked for security");
+  return null;
+}
 
   const user = auth.currentUser;
   if (!user) return null;
 
+  const allowed = await rateLimit(auth.currentUser.uid, "upload", 5, 60);
+if (!allowed) {
+  alert("Upload limit reached. Try later.");
+  return null;
+}
+await db.collection("upload_logs").add({
+  uid: user.uid,
+  size: file.size,
+  time: new Date()
+});
   // Add watermark
   const img = new Image();
   const canvas = document.createElement("canvas");
@@ -537,8 +623,19 @@ async function uploadImage(file, folder="images") {
   return new Promise(resolve => {
     reader.onload = e => {
       img.onload = async () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
+        const MAX = 1600;
+let w = img.width;
+let h = img.height;
+
+if (w > MAX || h > MAX) {
+  const scale = Math.min(MAX / w, MAX / h);
+  w *= scale;
+  h *= scale;
+}
+
+canvas.width = w;
+canvas.height = h;
+ctx.drawImage(img, 0, 0, w, h);
 
         ctx.drawImage(img, 0, 0);
 
@@ -602,7 +699,9 @@ async function checkDuplicateAccount() {
   const uid = auth.currentUser.uid;
 
   const mySec = await db.collection("user_security").doc(uid).get();
-  const myIP = mySec.data()?.ip;
+if (!mySec.exists) return;
+
+const myIP = mySec.data().ip;
 
   if (!myIP) return;
 
@@ -610,7 +709,27 @@ async function checkDuplicateAccount() {
     .where("ip", "==", myIP)
     .get();
 
+  const myFP = getDeviceFingerprint();
+
+const fpSnap = await db.collection("device_fingerprints")
+  .where("fingerprint", "==", myFP)
+  .get();
+
+if (fpSnap.size > 2) {
+  await db.collection("activity_logs").add({
+    uid: uid,
+    action: "multiple_devices",
+    time: new Date()
+  });
+  logout();
+}
+
   if (snap.size > 2) {
+    await db.collection("activity_logs").add({
+  uid: uid,
+  action: "multiple_accounts",
+  time: new Date()
+});
     alert("Multiple accounts detected. Contact admin.");
     logout();
   }
@@ -632,7 +751,14 @@ async function detectScamBehavior(uid) {
     if (a === "multiple_accounts") risk += 50;
     if (a === "chargeback") risk += 60;
   });
+    if (risk >= 60 && risk < 80) {
+  const orders = await db.collection("orders")
+    .where("buyer", "==", uid)
+    .where("status", "!=", "completed")
+    .get();
 
+  orders.forEach(doc => freezeOrder(doc.id, "High risk user"));
+}
   if (risk >= 80) {
     await db.collection("users").doc(uid).update({
       banned: true,
@@ -659,4 +785,141 @@ async function checkPaymentProof(hash) {
   }
 
   return true;
+}
+async function freezeOrder(orderId, reason="Suspicious activity") {
+  await db.collection("orders").doc(orderId).update({
+    frozen: true,
+    freezeReason: reason,
+    frozenAt: new Date()
+  });
+}
+
+function getDeviceFingerprint() {
+  return btoa(
+    navigator.userAgent +
+    screen.width +
+    screen.height +
+    Intl.DateTimeFormat().resolvedOptions().timeZone
+  );
+}
+
+async function banUser(uid, reason="Violation") {
+  await db.collection("users").doc(uid).update({
+    banned: true,
+    bannedReason: reason,
+    bannedAt: new Date()
+  });
+}
+
+async function unbanUser(uid) {
+  await db.collection("users").doc(uid).update({
+    banned: false,
+    bannedReason: null
+  });
+}
+
+async function rateLimit(uid, action, limit=10, seconds=60) {
+  const now = Date.now();
+  const ref = db.collection("rate_limits").doc(uid + "_" + action);
+  const docSnap = await ref.get();
+
+  if (!docSnap.exists) {
+    await ref.set({ count: 1, time: now });
+    return true;
+  }
+
+  const data = docSnap.data();
+
+  if (now - data.time > seconds * 1000) {
+    await ref.set({ count: 1, time: now });
+    return true;
+  }
+
+  if (data.count >= limit) return false;
+
+  await ref.update({ count: data.count + 1 });
+  return true;
+}
+
+async function advancedFraudScan(uid) {
+  const logs = await db.collection("activity_logs")
+    .where("uid", "==", uid)
+    .orderBy("time", "desc")
+    .limit(20)
+    .get();
+
+  let score = 0;
+
+  logs.forEach(doc => {
+    const a = doc.data().action;
+
+    if (a === "fake_proof") score += 40;
+    if (a === "multiple_accounts") score += 50;
+    if (a === "multiple_devices") score += 40;
+    if (a === "failed_payment") score += 20;
+    if (a === "chargeback") score += 60;
+    if (a === "fake_id_detected") score += 50;
+  });
+  await systemLockdownCheck();
+  await db.collection("fraud_scores").doc(uid).set({
+    score: score,
+    updated: new Date()
+  }, { merge: true });
+  await detectFraudNetwork(uid);
+  return score;
+}
+
+async function shadowBan(uid) {
+  await db.collection("users").doc(uid).update({
+    shadowBanned: true,
+    shadowBanAt: new Date()
+  });
+}
+
+async function systemLockdownCheck() {
+  const recent = await db.collection("activity_logs")
+    .where("action", "in", ["fake_proof", "multiple_accounts"])
+    .get();
+
+  if (recent.size > 20) {
+    await db.collection("system").doc("lockdown").set({
+      active: true,
+      time: new Date()
+    });
+  }
+}
+function fraudColor(score) {
+  if (score >= 120) return "red";
+  if (score >= 80) return "orange";
+  if (score >= 40) return "yellow";
+  return "lightgreen";
+}
+async function securityHeartbeat(uid) {
+  await db.collection("security_heartbeat").doc(uid).set({
+    lastSeen: new Date(),
+    online: true
+  }, { merge: true });
+}
+
+async function detectFraudNetwork(uid) {
+  const my = await db.collection("payment_links")
+    .where("uid", "==", uid)
+    .limit(1)
+    .get();
+
+  if (my.empty) return;
+
+  const d = my.docs[0].data();
+
+  const network = await db.collection("payment_links")
+    .where("wallet", "==", d.wallet)
+    .get();
+
+  if (network.size > 5) {
+    await db.collection("activity_logs").add({
+      uid: uid,
+      action: "fraud_network_detected",
+      time: new Date()
+    });
+  }
 }
