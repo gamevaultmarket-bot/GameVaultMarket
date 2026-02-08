@@ -62,3 +62,51 @@ input, textarea, select {
   display:inline-block;
   font-size:12px;
 }
+
+/* ===== Smooth UI ===== */
+* {
+  box-sizing: border-box;
+}
+
+button {
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+button:hover {
+  opacity: 0.85;
+  transform: scale(1.02);
+}
+
+/* ===== Inputs ===== */
+input, textarea, select {
+  border-radius: 6px;
+  border: none;
+  outline: none;
+}
+
+/* ===== Cards ===== */
+.card {
+  backdrop-filter: blur(6px);
+  border: 1px solid #ffffff22;
+}
+
+/* ===== Images inside listings ===== */
+.card img {
+  border-radius: 6px;
+  margin-top: 8px;
+  max-height: 220px;
+  object-fit: cover;
+}
+
+/* ===== Mobile Fix ===== */
+@media (max-width:600px) {
+  nav {
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  button {
+    flex: 1 1 45%;
+  }
+}
