@@ -10,6 +10,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
+  <!-- Style -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -18,7 +19,8 @@
   <h1>GameVault Market</h1>
   <p>P2P Game Account Marketplace</p>
 </header>
-
+  
+  <!-- NAVBAR -->
 <nav id="nav" class="hidden">
   <button onclick="show('home')">Home</button>
   <button id="sellBtn" class="hidden" onclick="show('sell')">Sell</button>
@@ -32,7 +34,7 @@
 <!-- AUTH -->
 <section id="auth">
   <h2>Login / Register</h2>
-  <input id="email" placeholder="Email">
+  <input id="email" type="email" placeholder="Email">
   <input id="password" type="password" placeholder="Password">
 
   <select id="role">
@@ -56,11 +58,14 @@
 <section id="verification" class="card hidden">
   <h3>Seller Verification ($3)</h3>
 
-  <label>ID Card / Passport Photo (URL)</label>
-  <input id="idPhotoUrl" placeholder="Paste image link (Imgur, Postimg...)">
+  <label>ID Card / Passport Photo</label>
+  <input type="file" id="idPhotoFile" accept="image/*">
 
-  <label>Selfie holding ID (URL)</label>
-  <input id="selfiePhotoUrl" placeholder="Paste image link">
+  <label>Selfie holding ID</label>
+  <input type="file" id="selfiePhotoFile" accept="image/*">
+
+  <label>Payment Screenshot</label>
+  <input type="file" id="paymentScreenshotFile" accept="image/*">
 
   <div id="paymentDetails"></div>
 
@@ -92,13 +97,12 @@
   <h2>Create Listing</h2>
   <input id="game" placeholder="Game name">
   <textarea id="details" placeholder="Account details"></textarea>
-  <input id="price" placeholder="Price USD">
+  <input id="price" type="number" step="0.01" placeholder="Price USD">
 
   <input id="players" placeholder="High-rated players (max 12)">
   <small>Example: Mbappé (91), Haaland (91)</small>
 
-  <input id="screenshotUrl" placeholder="Screenshot image URL">
-  <input type="file" id="imageFile" accept="image/*">
+  <input type="file" id="listingScreenshotFile" accept="image/*">
   <button onclick="createListing()">Submit</button>
 </section>
 
