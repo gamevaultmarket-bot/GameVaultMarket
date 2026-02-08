@@ -637,8 +637,6 @@ canvas.width = w;
 canvas.height = h;
 ctx.drawImage(img, 0, 0, w, h);
 
-        ctx.drawImage(img, 0, 0);
-
         ctx.font = "20px Arial";
         ctx.fillStyle = "rgba(255,0,0,0.6)";
         ctx.fillText("GameVaultMarket • " + user.uid, 20, canvas.height - 20);
@@ -797,8 +795,7 @@ async function freezeOrder(orderId, reason="Suspicious activity") {
 function getDeviceFingerprint() {
   return btoa(
     navigator.userAgent +
-    screen.width +
-    screen.height +
+    (window.screen?.width || 0) + (window.screen?.height || 0)
     Intl.DateTimeFormat().resolvedOptions().timeZone
   );
 }
@@ -881,7 +878,7 @@ async function systemLockdownCheck() {
     .where("action", "in", ["fake_proof", "multiple_accounts"])
     .get();
 
-  if (recent.size > 20) {
+  if (recent.size > 50) {
     await db.collection("system").doc("lockdown").set({
       active: true,
       time: new Date()
