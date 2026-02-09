@@ -132,7 +132,8 @@ auth.onAuthStateChanged(async user => {
   const snap = await db.collection("users").doc(user.uid).get();
 
 if (!snap.exists) {
-  return; // DO NOT overwrite role created during signup
+  console.log("User doc missing");
+  return;
 }
 
   const data = snap.data() || {};
@@ -155,12 +156,12 @@ if (fraudScore >= 120) {
   adminBtn.classList.add("hidden");
 
   // Admin
-  if (data.role === "admin") {
-    adminBtn.classList.remove("hidden");
-    show("admin");
-    loadAdmin();
-    return;
-  }
+if ((data.role || "").toLowerCase().trim() === "admin") {
+  adminBtn.classList.remove("hidden");
+  show("admin");
+  loadAdmin();
+  return;
+}
 
   // Seller not verified — LOCK the app
 if (data.role === "seller" && !data.verified) {
