@@ -30,6 +30,8 @@ const messages = document.getElementById("messages");
 const msgInput = document.getElementById("msgInput");
 const payoutMethod = document.getElementById("payoutMethod");
 const payoutAddress = document.getElementById("payoutAddress");
+const adminUsers = document.getElementById("adminUsers");
+const adminOrders = document.getElementById("adminOrders");
 
 const PAYMENTS = {
   skrill: "gamevaultmarket@gmail.com",
