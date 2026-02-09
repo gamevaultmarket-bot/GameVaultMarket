@@ -203,11 +203,18 @@ if (fraudScore >= 120) {
   sellBtn.classList.add("hidden");
   adminBtn.classList.add("hidden");
 
-  // Admin
-if ((data.role || "").toLowerCase().trim() === "admin") {
-  adminBtn.classList.remove("hidden");
-  show("admin");
-  loadAdmin();
+  // ===== ADMIN CHECK (FIXED) =====
+const role = (data.role || "").toString().toLowerCase().trim();
+console.log("ROLE:", role);
+
+if (role === "admin") {
+  console.log("ADMIN DETECTED");
+
+  nav.classList.remove("hidden");          // make sure nav is visible
+  adminBtn.classList.remove("hidden");     // show admin button
+
+  show("admin");                           // open admin panel
+  loadAdmin();                             // load admin data
   return;
 }
 
