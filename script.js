@@ -1,81 +1,61 @@
-/* ================= FIREBASE ================= */
-
-firebase.initializeApp({
+// ================= FIREBASE =================
+const firebaseConfig = {
   apiKey: "AIzaSyBfGXL6lKmBTZ9FIxsmsP_-40_-MZ33zBw",
-  authDomain: "gamevaultmarket-5e494.firebaseapp.com",
-  projectId: "gamevaultmarket-5e494"
-});
+  authDomain: "YOUR_DOMAIN",
+  projectId: "YOUR_PROJECT_ID"
+};
 
+firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-/* ================= SUPABASE ================= */
+// ================= SUPABASE =================
+const supabase = window.supabase.createClient(
+  "https://pmgmbpwscyrsyrgyqsyy.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtZ21icHdzY3lyc3lyZ3lxc3l5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MjAxMTQsImV4cCI6MjA4NTk5NjExNH0.PKF5Rc9LRZLKO7FuALPdSF4kiourN5NgZP6IUgk1BJ0";
+);
 
-const SUPABASE_URL = "https://pmgmbpwscyrsyrgyqsyy.supabase.co";
-const const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtZ21icHdzY3lyc3lyZ3lxc3l5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MjAxMTQsImV4cCI6MjA4NTk5NjExNH0.PKF5Rc9LRZLKO7FuALPdSF4kiourN5NgZP6IUgk1BJ0";
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-/* ================= ELEMENTS ================= */
-
+// ================= UI =================
 const nav = document.getElementById("nav");
 const sellBtn = document.getElementById("sellBtn");
 const adminBtn = document.getElementById("adminBtn");
 
-const email = document.getElementById("email");
-const password = document.getElementById("password");
-const roleSelect = document.getElementById("role");
+function show(id) {
+  document.querySelectorAll("section").forEach(s => s.classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
+}
 
-const listings = document.getElementById("listings");
-const ordersList = document.getElementById("ordersList");
-const adminUsers = document.getElementById("adminUsers");
-const adminOrders = document.getElementById("adminOrders");
-
-/* ================= AUTH ================= */
-
+// ================= AUTH =================
 async function signup() {
-  try {
-    if (password.value.length < 6) {
-      alert("Password must be at least 6 characters");
-      return;
-    }
+  const email = emailEl.value.trim();
+  const pass = passwordEl.value.trim();
+  const role = roleEl.value;
 
-    const res = await auth.createUserWithEmailAndPassword(
-      email.value.trim(),
-      password.value
-    );
+  if (!email || !pass) return alert("Enter email/password");
 
-    await db.collection("users").doc(res.user.uid).set({
-      email: email.value.trim(),
-      role: roleSelect.value || "buyer",
-      verified: false,
-      created: new Date()
-    });
+  const cred = await auth.createUserWithEmailAndPassword(email, pass);
 
-    alert("Account created");
+  await db.collection("users").doc(cred.user.uid).set({
+    email,
+    role,
+    verified: false,
+    banned: false
+  });
 
-  } catch (e) {
-    alert(e.message);
-  }
+  alert("Signup success");
 }
 
-function login() {
-  if (!email.value || !password.value) {
-    alert("Enter email and password");
-    return;
-  }
+async function login() {
+  const email = emailEl.value.trim();
+  const pass = passwordEl.value.trim();
 
-  auth.signInWithEmailAndPassword(email.value.trim(), password.value)
-    .catch(e => alert(e.message));
+  if (!email || !pass) return alert("Enter email/password");
+
+  await auth.signInWithEmailAndPassword(email, pass);
 }
 
-function logout() {
-  auth.signOut();
-}
-
-/* ================= AUTH STATE ================= */
-
+// ================= AUTH STATE =================
 auth.onAuthStateChanged(async user => {
-
   if (!user) {
     nav.classList.add("hidden");
     show("auth");
@@ -83,28 +63,34 @@ auth.onAuthStateChanged(async user => {
   }
 
   nav.classList.remove("hidden");
-  document.getElementById("auth").classList.add("hidden");
 
   const snap = await db.collection("users").doc(user.uid).get();
+  const data = snap.data();
 
-  if (!snap.exists) return;
-
-  const data = snap.data() || {};
-  const role = (data.role || "").toLowerCase().trim();
-
-  /* RESET BUTTONS */
   sellBtn.classList.add("hidden");
   adminBtn.classList.add("hidden");
 
-  /* ADMIN */
-  if (role === "admin") {
+  // ADMIN
+  if (data.role === "admin") {
     adminBtn.classList.remove("hidden");
     show("admin");
     loadAdmin();
     return;
   }
 
-  /* SELLER */
+  // SELLER NOT VERIFIED
+  if (data.role === "seller" && !data.verified) {
+    show("verification");
+    nav.classList.add("hidden");
+    return;
+  }
+
+  // VERIFIED SELLER BUT NO PAYOUT
+  if (data.role === "seller" && data.verified && !data.payout) {
+    show("payout");
+    return;
+  }
+
   if (data.role === "seller" && data.verified) {
     sellBtn.classList.remove("hidden");
   }
@@ -112,195 +98,96 @@ auth.onAuthStateChanged(async user => {
   show("risk");
 });
 
-/* ================= UI ================= */
-
-function show(id) {
-  document.querySelectorAll("section").forEach(s => s.classList.add("hidden"));
-  document.getElementById(id).classList.remove("hidden");
-}
-
-/* ================= RISK ================= */
-
+// ================= RISK =================
 function acceptRisk() {
-  if (!document.getElementById("agreeRisk").checked) {
-    alert("Accept risk first");
-    return;
-  }
+  if (!agreeRisk.checked) return alert("Accept risk");
   show("home");
-  loadListings();
 }
 
-/* ================= IMAGE UPLOAD (SUPABASE) ================= */
+// ================= VERIFICATION =================
+async function submitVerification() {
+  const user = auth.currentUser;
 
-async function uploadImage(file, folder = "images") {
-  if (!file) return null;
+  const idFile = idFileEl.files[0];
+  const selfieFile = selfieFileEl.files[0];
+  const paymentFile = paymentFileEl.files[0];
 
-  const uid = auth.currentUser.uid;
-  const path = `${folder}/${uid}_${Date.now()}.jpg`;
+  if (!idFile || !selfieFile || !paymentFile)
+    return alert("Upload all files");
 
-  const { error } = await supabaseClient.storage
-    .from("images")
-    .upload(path, file);
+  await supabase.storage.from("Verification").upload(`${user.uid}_id`, idFile);
+  await supabase.storage.from("Verification").upload(`${user.uid}_selfie`, selfieFile);
+  await supabase.storage.from("Verification").upload(`${user.uid}_payment`, paymentFile);
 
-  if (error) {
-    alert(error.message);
-    return null;
-  }
+  await db.collection("verifications").doc(user.uid).set({
+    uid: user.uid,
+    status: "pending",
+    time: Date.now()
+  });
 
-  const { data } = supabaseClient.storage
-    .from("images")
-    .getPublicUrl(path);
-
-  return data.publicUrl;
+  alert("Verification submitted");
 }
 
-/* ================= LISTINGS ================= */
+// ================= PAYOUT =================
+async function savePayout() {
+  const user = auth.currentUser;
 
-function loadListings() {
-  db.collection("listings")
-    .where("status", "==", "active")
-    .onSnapshot(snap => {
-      listings.innerHTML = "";
+  await db.collection("users").doc(user.uid).update({
+    payout: {
+      method: payoutMethod.value,
+      address: payoutAddress.value
+    }
+  });
 
-      snap.forEach(doc => {
-        const d = doc.data();
-
-        listings.innerHTML += `
-          <div class="card">
-            <b>${d.game}</b> - $${d.price}<br>
-            ${d.screenshot ? `<img src="${d.screenshot}" style="max-width:100%">` : ""}
-            <br>
-            <button onclick="buy('${doc.id}')">Buy</button>
-          </div>
-        `;
-      });
-    });
+  alert("Payout saved");
+  show("home");
 }
 
-/* ================= CREATE LISTING ================= */
-
+// ================= LISTING =================
 async function createListing() {
-  const game = document.getElementById("game").value.trim();
-  const details = document.getElementById("details").value.trim();
-  const price = parseFloat(document.getElementById("price").value);
+  const user = auth.currentUser;
 
-  if (!game || !price) {
-    alert("Enter game and price");
-    return;
-  }
+  const file = listingFile.files[0];
+  if (!file) return alert("Upload screenshot");
 
-  const file = document.getElementById("listingScreenshotFile").files[0];
-  const screenshot = file ? await uploadImage(file, "listings") : null;
+  const path = `${user.uid}_${Date.now()}`;
+  await supabase.storage.from("Listings").upload(path, file);
 
   await db.collection("listings").add({
-    game,
-    details,
-    price,
-    screenshot,
-    seller: auth.currentUser.uid,
-    status: "active",
-    created: new Date()
+    uid: user.uid,
+    game: game.value,
+    details: details.value,
+    price: price.value,
+    image: path,
+    time: Date.now()
   });
 
   alert("Listing created");
 }
 
-/* ================= BUY ================= */
+// ================= ADMIN =================
+async function loadAdmin() {
+  const usersSnap = await db.collection("verifications").get();
+  adminUsers.innerHTML = "";
 
-async function buy(id) {
-  await db.collection("orders").add({
-    listingId: id,
-    buyer: auth.currentUser.uid,
-    status: "pending",
-    created: new Date()
+  usersSnap.forEach(doc => {
+    const d = doc.data();
+    adminUsers.innerHTML += `
+      <div>
+        ${d.uid} — ${d.status}
+        <button onclick="approve('${d.uid}')">Approve</button>
+      </div>
+    `;
   });
-
-  alert("Order created");
-  openOrders();
 }
 
-/* ================= ORDERS ================= */
-
-function openOrders() {
-  show("orders");
-  loadOrders();
+async function approve(uid) {
+  await db.collection("users").doc(uid).update({ verified: true });
+  await db.collection("verifications").doc(uid).update({ status: "approved" });
+  alert("Seller verified");
 }
 
-function loadOrders() {
-  db.collection("orders")
-    .where("buyer", "==", auth.currentUser.uid)
-    .onSnapshot(snap => {
-      ordersList.innerHTML = "";
-
-      snap.forEach(doc => {
-        const d = doc.data();
-
-        ordersList.innerHTML += `
-          <div class="card">
-            Order: ${doc.id}<br>
-            Status: ${d.status}
-          </div>
-        `;
-      });
-    });
-}
-
-/* ================= ADMIN ================= */
-
-function loadAdmin() {
-
-  /* VERIFICATIONS */
-  db.collection("verifications")
-    .where("status", "==", "pending")
-    .onSnapshot(snap => {
-      adminUsers.innerHTML = "";
-
-      snap.forEach(doc => {
-        const v = doc.data();
-
-        adminUsers.innerHTML += `
-          <div class="card">
-            Seller: ${doc.id}<br>
-            <a href="${v.idPhotoUrl}" target="_blank">View ID</a><br>
-            <button onclick="approveSeller('${doc.id}')">Approve</button>
-          </div>
-        `;
-      });
-    });
-
-  /* LISTINGS */
-  db.collection("listings")
-    .onSnapshot(snap => {
-      adminOrders.innerHTML = "";
-
-      snap.forEach(doc => {
-        const d = doc.data();
-
-        adminOrders.innerHTML += `
-          <div class="card">
-            ${d.game} - $${d.price}<br>
-            Status: ${d.status}<br>
-            <button onclick="removeListing('${doc.id}')">Remove</button>
-          </div>
-        `;
-      });
-    });
-}
-
-async function approveSeller(uid) {
-  await db.collection("users").doc(uid).update({
-    verified: true
-  });
-
-  await db.collection("verifications").doc(uid).update({
-    status: "approved"
-  });
-
-  alert("Seller approved");
-}
-
-async function removeListing(id) {
-  await db.collection("listings").doc(id).update({
-    status: "removed"
-  });
+// ================= LOGOUT =================
+function logout() {
+  auth.signOut();
 }
