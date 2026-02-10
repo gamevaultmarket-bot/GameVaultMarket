@@ -1,7 +1,7 @@
 /* ================= FIREBASE ================= */
 
 firebase.initializeApp({
-  apiKey: "YOUR_FIREBASE_KEY",
+  apiKey: "AIzaSyBfGXL6lKmBTZ9FIxsmsP_-40_-MZ33zBw",
   authDomain: "gamevaultmarket-5e494.firebaseapp.com",
   projectId: "gamevaultmarket-5e494"
 });
@@ -12,7 +12,7 @@ const db = firebase.firestore();
 /* ================= SUPABASE ================= */
 
 const SUPABASE_URL = "https://pmgmbpwscyrsyrgyqsyy.supabase.co";
-const SUPABASE_KEY = "YOUR_SUPABASE_PUBLIC_KEY";
+const const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtZ21icHdzY3lyc3lyZ3lxc3l5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MjAxMTQsImV4cCI6MjA4NTk5NjExNH0.PKF5Rc9LRZLKO7FuALPdSF4kiourN5NgZP6IUgk1BJ0";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ================= ELEMENTS ================= */
