@@ -10,6 +10,9 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
+  <!-- Supabase (Storage for images) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <!-- Style -->
   <link rel="stylesheet" href="style.css">
 </head>
@@ -19,8 +22,8 @@
   <h1>GameVault Market</h1>
   <p>P2P Game Account Marketplace</p>
 </header>
-  
-  <!-- NAVBAR -->
+
+<!-- NAVBAR -->
 <nav id="nav" class="hidden">
   <button onclick="show('home')">Home</button>
   <button id="sellBtn" class="hidden" onclick="show('sell')">Sell</button>
@@ -47,7 +50,7 @@
 </section>
 
 <!-- RISK -->
-<section id="risk" class="card hidden">
+<section id="risk" class="hidden">
   <h3>⚠️ Risk Notice</h3>
   <p>This is a P2P marketplace. GameVault does not hold funds.</p>
   <label><input type="checkbox" id="agreeRisk"> I understand</label>
@@ -55,8 +58,8 @@
 </section>
 
 <!-- VERIFICATION -->
-<section id="verification" class="card hidden">
-  <h3>Seller Verification ($3)</h3>
+<section id="verification" class="hidden">
+  <h3>Seller Verification</h3>
 
   <label>ID Card / Passport Photo</label>
   <input type="file" id="idPhotoFile" accept="image/*">
@@ -73,7 +76,7 @@
 </section>
 
 <!-- PAYOUT -->
-<section id="payout" class="card hidden">
+<section id="payout" class="hidden">
   <h3>Set Payout Method</h3>
   <select id="payoutMethod">
     <option value="">Select</option>
@@ -98,10 +101,7 @@
   <input id="game" placeholder="Game name">
   <textarea id="details" placeholder="Account details"></textarea>
   <input id="price" type="number" step="0.01" placeholder="Price USD">
-
-  <input id="players" placeholder="High-rated players (max 12)">
-  <small>Example: Mbappé (91), Haaland (91)</small>
-
+  <input id="players" placeholder="Top players (comma separated)">
   <input type="file" id="listingScreenshotFile" accept="image/*">
   <button onclick="createListing()">Submit</button>
 </section>
@@ -124,9 +124,9 @@
 <section id="admin" class="hidden">
   <h2>Admin Panel</h2>
   <h3>Seller Verifications</h3>
-  
   <div id="adminUsers"></div>
-  <h3>Orders</h3>
+
+  <h3>Listings</h3>
   <div id="adminOrders"></div>
 </section>
 
@@ -138,7 +138,7 @@
   <a href="payment.html">Payment</a>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="script.js"></script>
+
 </body>
 </html>
