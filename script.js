@@ -10,8 +10,6 @@ firebase.initializeApp({
   projectId: "gamevaultmarket-5e494"
 });
 // Listen for login
-firebase.auth().onAuthStateChanged(async (user) => {
-
   if (!user) {
     console.log("No user logged in");
     return;
@@ -37,10 +35,10 @@ firebase.auth().onAuthStateChanged(async (user) => {
     if (data.role === "admin") {
       console.log("ADMIN DETECTED");
 
-      const adminPanel = document.getElementById("adminPanel");
-      if (adminPanel) {
-        adminPanel.style.display = "block";
-      }
+      const adminPanel = document.getElementById("admin"); // matches HTML
+if (adminPanel) {
+  adminPanel.classList.remove("hidden"); // show it
+}
 
     } else {
       console.log("Not admin");
@@ -166,84 +164,81 @@ function logout() {
 
 /* AUTH STATE */
 auth.onAuthStateChanged(async user => {
+
   if (!user) {
-  nav.classList.add("hidden");
-  show("auth");
-  return;
-}
-
-  // Hide login/signup section
-  document.getElementById("auth").classList.add("hidden");
-  nav.classList.remove("hidden");
-
-  // Fetch user data
-  const snap = await db.collection("users").doc(user.uid).get();
-
-if (!snap.exists) {
-  console.log("User doc missing");
-  return;
-}
-
-  const data = snap.data() || {};
-  await checkDuplicateAccount();
-  await detectScamBehavior(user.uid);
-  if (data.banned) {
-  alert("Account banned: " + (data.bannedReason || "Security violation"));
-  await auth.signOut();
-  return;
-}
-
-const fraudScore = await advancedFraudScan(user.uid);
-
-if (fraudScore >= 120) {
-  await shadowBan(user.uid);
-}
-
-  // Reset buttons
-  sellBtn.classList.add("hidden");
-  adminBtn.classList.add("hidden");
-
-  // ===== ADMIN CHECK (FIXED) =====
-const role = (data.role || "").toString().toLowerCase().trim();
-console.log("ROLE:", role);
-
-if (role === "admin") {
-  console.log("ADMIN DETECTED");
-
-  nav.classList.remove("hidden");          // make sure nav is visible
-  adminBtn.classList.remove("hidden");     // show admin button
-
-  show("admin");                           // open admin panel
-  loadAdmin();                             // load admin data
-  return;
-}
-
-  // Seller not verified — LOCK the app
-if (data.role === "seller" && !data.verified) {
-  show("verification");
-
-  // Hide everything else
-  nav.classList.add("hidden");
-
-  paymentDetails.innerHTML = `
-    Skrill: ${PAYMENTS.skrill}<br>
-    USDT: ${PAYMENTS.usdt}<br>
-    Grey ACH: ${PAYMENTS.grey}
-  `;
-  return;
-}
-
-  // Seller verified but payout missing
-  if (data.role === "seller" && data.verified && !data.payout) {
-    show("payout");
+    nav.classList.add("hidden");
+    show("auth");
     return;
   }
 
-  // Verified seller or buyer
-  if (data.role === "seller" && data.verified) sellBtn.classList.remove("hidden");
+  // Hide login section
+  document.getElementById("auth").classList.add("hidden");
+  nav.classList.remove("hidden");
 
-  // Finally, show risk page
-  show("risk");
+  try {
+    const snap = await db.collection("users").doc(user.uid).get();
+
+    if (!snap.exists) {
+      console.log("User doc missing");
+      return;
+    }
+
+    const data = snap.data() || {};
+    const role = (data.role || "").toString().toLowerCase().trim();
+
+    console.log("ROLE:", role);
+
+    // Reset buttons first
+    sellBtn.classList.add("hidden");
+    adminBtn.classList.add("hidden");
+
+    /* =========================
+       ADMIN
+    ========================== */
+    if (role === "admin") {
+      console.log("ADMIN DETECTED");
+
+      adminBtn.classList.remove("hidden");   // show admin button
+      show("admin");                         // open admin page
+      loadAdmin();                           // load admin data
+      return;
+    }
+
+    /* =========================
+       SELLER NOT VERIFIED
+    ========================== */
+    if (data.role === "seller" && !data.verified) {
+      nav.classList.add("hidden");
+      show("verification");
+
+      paymentDetails.innerHTML = `
+        Skrill: ${PAYMENTS.skrill}<br>
+        USDT: ${PAYMENTS.usdt}<br>
+        Grey ACH: ${PAYMENTS.grey}
+      `;
+      return;
+    }
+
+    /* =========================
+       SELLER VERIFIED BUT NO PAYOUT
+    ========================== */
+    if (data.role === "seller" && data.verified && !data.payout) {
+      show("payout");
+      return;
+    }
+
+    /* =========================
+       NORMAL USER
+    ========================== */
+    if (data.role === "seller" && data.verified) {
+      sellBtn.classList.remove("hidden");
+    }
+
+    show("risk");
+
+  } catch (err) {
+    console.error("AUTH ERROR:", err);
+  }
 });
 
 /* UI */
@@ -254,7 +249,9 @@ function authSection() {
 function show(id) {
   document.querySelectorAll("section").forEach(s => s.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
+  nav.classList.remove("hidden"); // always keep nav visible
 }
+
 function blockIfNotVerified() {
   const user = auth.currentUser;
   if (!user) return;
