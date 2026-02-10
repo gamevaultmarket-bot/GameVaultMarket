@@ -9,52 +9,7 @@ firebase.initializeApp({
   authDomain: "gamevaultmarket-5e494.firebaseapp.com",
   projectId: "gamevaultmarket-5e494"
 });
-// Listen for login
-  if (!user) {
-    console.log("No user logged in");
-    return;
-  }
 
-  console.log("User logged in:", user.uid);
-
-  try {
-    const doc = await firebase.firestore()
-      .collection("users")
-      .doc(user.uid)
-      .get();
-
-    if (!doc.exists) {
-      console.log("User document not found");
-      return;
-    }
-
-    const data = doc.data();
-    console.log("User data:", data);
-
-    // ✅ Check ADMIN
-    if (data.role === "admin") {
-      console.log("ADMIN DETECTED");
-
-      const adminPanel = document.getElementById("admin"); // matches HTML
-if (adminPanel) {
-  adminPanel.classList.remove("hidden"); // show it
-}
-
-    } else {
-      console.log("Not admin");
-    }
-
-    // ✅ Check verification
-    if (data.verified === false) {
-      console.log("User NOT verified");
-      // block app here if you want
-    }
-
-  } catch (err) {
-    console.error("FIRESTORE ERROR:", err);
-  }
-
-});
 
 const auth = firebase.auth();
 const db = firebase.firestore();
