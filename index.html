@@ -1,144 +1,125 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>GameVault Market</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GameVault Market</title>
 
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-  <!-- Supabase (Storage for images) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- Style -->
-  <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header>
-  <h1>GameVault Market</h1>
-  <p>P2P Game Account Marketplace</p>
+<h1>GameVault Market</h1>
+<p>P2P Game Account Marketplace</p>
 </header>
 
-<!-- NAVBAR -->
+<!-- NAV -->
 <nav id="nav" class="hidden">
-  <button onclick="show('home')">Home</button>
-  <button id="sellBtn" class="hidden" onclick="show('sell')">Sell</button>
-  <button onclick="openOrders()">Orders</button>
-  <button id="adminBtn" class="hidden" onclick="show('admin')">Admin</button>
-  <button onclick="logout()">Logout</button>
+<button onclick="show('home')">Home</button>
+<button id="sellBtn" class="hidden" onclick="show('sell')">Sell</button>
+<button onclick="show('orders')">Orders</button>
+<button id="adminBtn" class="hidden" onclick="show('admin')">Admin</button>
+<button onclick="logout()">Logout</button>
 </nav>
 
 <div class="container">
 
 <!-- AUTH -->
 <section id="auth">
-  <h2>Login / Register</h2>
-  <input id="email" type="email" placeholder="Email">
-  <input id="password" type="password" placeholder="Password">
+<h2>Login / Register</h2>
 
-  <select id="role">
-    <option value="buyer">Buyer</option>
-    <option value="seller">Seller</option>
-  </select>
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
 
-  <button onclick="signup()">Sign Up</button>
-  <button onclick="login()">Login</button>
+<select id="role">
+<option value="buyer">Buyer</option>
+<option value="seller">Seller</option>
+</select>
+
+<button type="button" onclick="signup()">Sign Up</button>
+<button type="button" onclick="login()">Login</button>
 </section>
 
 <!-- RISK -->
 <section id="risk" class="hidden">
-  <h3>⚠️ Risk Notice</h3>
-  <p>This is a P2P marketplace. GameVault does not hold funds.</p>
-  <label><input type="checkbox" id="agreeRisk"> I understand</label>
-  <button onclick="acceptRisk()">Continue</button>
+<h2>Risk Disclosure</h2>
+<p>Digital accounts carry risk. GameVault is not responsible for losses.</p>
+<label><input type="checkbox" id="agreeRisk"> I understand</label>
+<button onclick="acceptRisk()">Continue</button>
 </section>
 
 <!-- VERIFICATION -->
 <section id="verification" class="hidden">
-  <h3>Seller Verification</h3>
+<h2>Seller Verification</h2>
 
-  <label>ID Card / Passport Photo</label>
-  <input type="file" id="idPhotoFile" accept="image/*">
+<input type="file" id="idFile">
+<input type="file" id="selfieFile">
+<input type="file" id="paymentFile">
 
-  <label>Selfie holding ID</label>
-  <input type="file" id="selfiePhotoFile" accept="image/*">
-
-  <label>Payment Screenshot</label>
-  <input type="file" id="paymentScreenshotFile" accept="image/*">
-
-  <div id="paymentDetails"></div>
-
-  <button onclick="submitVerification()">Submit Verification</button>
+<button onclick="submitVerification()">Submit Verification</button>
 </section>
 
 <!-- PAYOUT -->
 <section id="payout" class="hidden">
-  <h3>Set Payout Method</h3>
-  <select id="payoutMethod">
-    <option value="">Select</option>
-    <option>Skrill</option>
-    <option>USDT</option>
-    <option>PayPal</option>
-    <option>Grey ACH</option>
-  </select>
-  <input id="payoutAddress" placeholder="Email / Wallet / Account">
-  <button onclick="savePayout()">Save</button>
+<h2>Payout Method</h2>
+
+<select id="payoutMethod">
+<option>Skrill</option>
+<option>USDT</option>
+<option>PayPal</option>
+</select>
+
+<input id="payoutAddress" placeholder="Email / Wallet">
+<button onclick="savePayout()">Save</button>
 </section>
 
 <!-- HOME -->
 <section id="home" class="hidden">
-  <h2>Listings</h2>
-  <div id="listings"></div>
+<h2>Listings</h2>
+<div id="listings"></div>
 </section>
 
 <!-- SELL -->
 <section id="sell" class="hidden">
-  <h2>Create Listing</h2>
-  <input id="game" placeholder="Game name">
-  <textarea id="details" placeholder="Account details"></textarea>
-  <input id="price" type="number" step="0.01" placeholder="Price USD">
-  <input id="players" placeholder="Top players (comma separated)">
-  <input type="file" id="listingScreenshotFile" accept="image/*">
-  <button onclick="createListing()">Submit</button>
+<h2>Create Listing</h2>
+
+<input id="game" placeholder="Game name">
+<textarea id="details"></textarea>
+<input id="price" placeholder="Price">
+
+<input type="file" id="listingFile">
+
+<button onclick="createListing()">Create</button>
 </section>
 
 <!-- ORDERS -->
 <section id="orders" class="hidden">
-  <h2>My Orders</h2>
-  <div id="ordersList"></div>
-</section>
-
-<!-- CHAT -->
-<section id="chat" class="hidden">
-  <h2>Private Chat</h2>
-  <div id="messages"></div>
-  <input id="msgInput" placeholder="Message">
-  <button onclick="sendMessage()">Send</button>
+<h2>Orders</h2>
+<div id="ordersList"></div>
 </section>
 
 <!-- ADMIN -->
 <section id="admin" class="hidden">
-  <h2>Admin Panel</h2>
-  <h3>Seller Verifications</h3>
-  <div id="adminUsers"></div>
+<h2>Admin Panel</h2>
 
-  <h3>Listings</h3>
-  <div id="adminOrders"></div>
+<h3>Seller Verifications</h3>
+<div id="adminUsers"></div>
+
+<h3>Orders</h3>
+<div id="adminOrders"></div>
 </section>
 
 </div>
 
-<footer>
-  <a href="terms.html">Terms</a> |
-  <a href="risk.html">Risk</a> |
-  <a href="payment.html">Payment</a>
-</footer>
-
 <script src="script.js"></script>
-
 </body>
 </html>
