@@ -1,60 +1,80 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>GameVault Market</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
+<title>GameVault Market</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-  <!-- Supabase -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
 <header>
-  <h1>GameVault Market</h1>
+<h1>GameVault Market</h1>
 </header>
 
-<!-- NAV -->
 <nav id="nav" class="hidden">
-  <button onclick="show('home')">Home</button>
-  <button id="adminBtn" class="hidden" onclick="show('admin')">Admin</button>
-  <button onclick="logout()">Logout</button>
+<button onclick="show('home')">Home</button>
+<button id="sellBtn" class="hidden" onclick="show('sell')">Sell</button>
+<button id="adminBtn" class="hidden" onclick="show('admin')">Admin</button>
+<button onclick="logout()">Logout</button>
 </nav>
 
 <div class="container">
 
 <!-- AUTH -->
 <section id="auth">
-  <h2>Login / Register</h2>
-  <input id="email" placeholder="Email">
-  <input id="password" type="password" placeholder="Password">
+<h2>Login / Register</h2>
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
 
-  <select id="role">
-    <option value="buyer">Buyer</option>
-    <option value="seller">Seller</option>
-  </select>
+<select id="role">
+<option value="buyer">Buyer</option>
+<option value="seller">Seller</option>
+</select>
 
-  <button onclick="signup()">Sign Up</button>
-  <button onclick="login()">Login</button>
+<button onclick="signup()">Sign Up</button>
+<button onclick="login()">Login</button>
+</section>
+
+<!-- VERIFICATION -->
+<section id="verification" class="hidden">
+<h2>Seller Verification ($3)</h2>
+
+<input type="file" id="idFile" accept="image/*">
+<input type="file" id="selfieFile" accept="image/*">
+
+<button onclick="submitVerification()">Submit</button>
 </section>
 
 <!-- HOME -->
 <section id="home" class="hidden">
-  <h2>Welcome</h2>
-  <p>System working ✔</p>
+<h2>Listings</h2>
+<div id="listings"></div>
+</section>
+
+<!-- SELL -->
+<section id="sell" class="hidden">
+<h2>Create Listing</h2>
+<input id="game" placeholder="Game">
+<textarea id="details" placeholder="Details"></textarea>
+<input id="price" placeholder="Price USD">
+<button onclick="createListing()">Post</button>
 </section>
 
 <!-- ADMIN -->
 <section id="admin" class="hidden">
-  <h2>Admin Panel</h2>
-  <p>Admin detected ✔</p>
+<h2>Admin Panel</h2>
+<div id="adminUsers"></div>
 </section>
 
 </div>
