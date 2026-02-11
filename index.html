@@ -56,6 +56,14 @@
 <button onclick="submitVerification()">Submit</button>
 </section>
 
+<!-- PAYMENT -->
+<section id="payment" class="hidden">
+  <h2>Payment</h2>
+  <div id="paymentInfo"></div>
+  <button onclick="confirmPayment()">I Have Paid</button>
+  <p id="timer"></p>
+</section>
+
 <!-- HOME -->
 <section id="home" class="hidden">
 <h2>Listings</h2>
@@ -69,6 +77,13 @@
 <textarea id="details" placeholder="Details"></textarea>
 <input id="price" placeholder="Price USD">
 <button onclick="createListing()">Post</button>
+</section>
+
+<section id="chat" class="hidden">
+  <h2>Chat</h2>
+  <div id="messages"></div>
+  <input id="msgInput">
+  <button onclick="sendMessage()">Send</button>
 </section>
 
 <!-- ADMIN -->
