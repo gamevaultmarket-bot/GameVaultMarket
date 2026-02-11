@@ -1,8 +1,8 @@
 // ================= FIREBASE =================
 const firebaseConfig = {
   apiKey: "AIzaSyBfGXL6lKmBTZ9FIxsmsP_-40_-MZ33zBw",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT",
+  authDomain: "gamevaultmarket-5e494.firebaseapp.com",
+  projectId: "gamevaultmarket-5e494",
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -11,7 +11,7 @@ const db = firebase.firestore();
 
 // ================= SUPABASE =================
 const SUPABASE_URL = "https://pmgmbpwscyrsyrgyqsyy.supabase.co";
-const SUPABASE_KEY = "YOUR_PUBLIC_ANON_KEY";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtZ21icHdzY3lyc3lyZ3lxc3l5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MjAxMTQsImV4cCI6MjA4NTk5NjExNH0.PKF5Rc9LRZLKO7FuALPdSF4kiourN5NgZP6IUgk1BJ0";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -24,7 +24,92 @@ function show(id) {
   document.querySelectorAll("section").forEach(s => s.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
 }
+const PAYMENTS = {
+  usdt: "USDT ERC20: 0x992d0E36A7409F0c9228B51C6bB8F875b1A4Af3B",
+  skrill: "Skrill: gamevaultmarket@gmail.com",
+  grey: "Grey: 212286724510"
+};
 
+let paymentEnd = 0;
+
+function startTimer(minutes = 40) {
+  paymentEnd = Date.now() + minutes * 60000;
+  updateTimer();
+}
+
+function updateTimer() {
+  const el = document.getElementById("timer");
+  const interval = setInterval(() => {
+    const left = paymentEnd - Date.now();
+    if (left <= 0) {
+      clearInterval(interval);
+      el.innerText = "Payment expired";
+      return;
+    }
+    const m = Math.floor(left / 60000);
+    const s = Math.floor((left % 60000) / 1000);
+    el.innerText = `Time left: ${m}:${s}`;
+  }, 1000);
+}
+
+function openPayment(type) {
+  show("payment");
+
+  document.getElementById("paymentInfo").innerHTML = `
+    ${PAYMENTS.usdt}<br>
+    ${PAYMENTS.skrill}<br>
+    ${PAYMENTS.grey}
+  `;
+
+  startTimer();
+  window.paymentType = type;
+}
+
+async function confirmPayment() {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  if (window.paymentType === "verification") {
+    await db.collection("users").doc(user.uid).update({
+      paidVerification: true
+    });
+    alert("Verification payment recorded");
+    show("verification");
+  }
+
+  if (window.paymentType === "service") {
+    alert("Service fee recorded");
+  }
+}
+const BLOCK_WORDS = [
+  "whatsapp","telegram","@","gmail",".com","+233",
+  "0x","bank","account","paypal","skrill","crypto"
+];
+
+function cleanMessage(msg) {
+  const lower = msg.toLowerCase();
+  for (let w of BLOCK_WORDS) {
+    if (lower.includes(w)) return "[Blocked: Contact/Payment info not allowed]";
+  }
+  return msg;
+}
+
+async function sendMessage() {
+  const user = auth.currentUser;
+  const text = document.getElementById("msgInput").value;
+
+  if (!text) return;
+
+  const safe = cleanMessage(text);
+
+  await db.collection("messages").add({
+    user: user.uid,
+    text: safe,
+    time: Date.now()
+  });
+
+  document.getElementById("msgInput").value = "";
+}
 // ================= AUTH =================
 async function signup() {
   const email = document.getElementById("email").value;
@@ -65,7 +150,7 @@ auth.onAuthStateChanged(async user => {
 
   const doc = await db.collection("users").doc(user.uid).get();
   const data = doc.data();
-
+await checkBan(user);
   sellBtn.classList.add("hidden");
   adminBtn.classList.add("hidden");
 
@@ -166,4 +251,35 @@ async function approve(uid) {
 
   alert("Seller approved");
   loadAdmin();
+}
+
+async function banUser(uid, reason="Fraud") {
+  await db.collection("users").doc(uid).update({
+    banned: true,
+    bannedReason: reason
+  });
+}
+
+async function checkBan(user) {
+  const doc = await db.collection("users").doc(user.uid).get();
+  const data = doc.data();
+
+  if (data.banned) {
+    alert("Account banned: " + data.bannedReason);
+    await auth.signOut();
+  }
+}
+
+async function createOrder(listingId, sellerId) {
+  const user = auth.currentUser;
+
+  const order = await db.collection("orders").add({
+    buyer: user.uid,
+    seller: sellerId,
+    listing: listingId,
+    status: "pending",
+    expires: Date.now() + 40*60000
+  });
+
+  openPayment("service");
 }
