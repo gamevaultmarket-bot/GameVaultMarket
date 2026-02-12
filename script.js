@@ -6,11 +6,11 @@
 /* ===== FIREBASE CONFIG ===== */
 const firebaseConfig = {
   apiKey: "AIzaSyBfGXL6lKmBTZ9FIxsmsP_-40_-MZ33zBw",
-  authDomain: "gamevault-market.firebaseapp.com",
-  projectId: "gamevault-market",
+  authDomain: "gamevaultmarket-5e494.firebaseapp.com",
+  projectId: "gamevaultmarket-5e494",
   storageBucket: "gamevault-market.appspot.com",
-  messagingSenderId: "000000000",
-  appId: "1:000000000:web:000000"
+  messagingSenderId: "399928480303",
+  appId: "1:399928480303:web:3640856906c7cb9eb4acda"
 };
 
 firebase.initializeApp(firebaseConfig);
