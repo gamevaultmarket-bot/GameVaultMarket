@@ -20,7 +20,7 @@ const db = firebase.firestore();
 
 /* ===== SUPABASE CONFIG ===== */
 const SUPABASE_URL = "https://pmgmbpwscyrsyrgyqsyy.supabase.co";
-const SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY_HERE"; // replace
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtZ21icHdzY3lyc3lyZ3lxc3l5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MjAxMTQsImV4cCI6MjA4NTk5NjExNH0.PKF5Rc9LRZLKO7FuALPdSF4kiourN5NgZP6IUgk1BJ0";
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
