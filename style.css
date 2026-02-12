@@ -1,48 +1,44 @@
-body {
-  margin:0;
-  font-family:Arial;
-  background:#0f172a;
-  color:#fff;
+body{
+font-family: Arial;
+background:#0f1115;
+color:white;
+margin:0;
 }
 
-header {
-  text-align:center;
-  padding:15px;
-  background:#020617;
+header{
+background:#151821;
+padding:15px;
+text-align:center;
 }
 
-nav {
-  display:flex;
-  gap:10px;
-  justify-content:center;
-  padding:10px;
-  background:#020617;
+nav{
+background:#1b1f2a;
+padding:10px;
+text-align:center;
 }
 
-button {
-  padding:8px 12px;
-  border:none;
-  border-radius:6px;
-  background:#2563eb;
-  color:white;
-  cursor:pointer;
+nav button{
+margin:5px;
+padding:10px 15px;
+background:#2a2f3d;
+color:white;
+border:none;
+cursor:pointer;
 }
 
-input, textarea {
-  width:100%;
-  padding:8px;
-  margin:6px 0;
-  border-radius:6px;
-  border:none;
+.hidden{display:none;}
+
+.container{
+padding:20px;
 }
 
-.page { padding:15px; }
-.hidden { display:none; }
-
-#authBox {
-  max-width:400px;
-  margin:40px auto;
-  background:#020617;
-  padding:20px;
-  border-radius:8px;
+input,select,button{
+display:block;
+margin:10px 0;
+padding:10px;
+width:100%;
+max-width:300px;
+background:#1b1f2a;
+color:white;
+border:1px solid #333;
 }
