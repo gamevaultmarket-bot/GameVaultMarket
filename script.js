@@ -1,113 +1,140 @@
-/* FIREBASE CONFIG */
-firebase.initializeApp({
+/* ===============================
+   GAMEVAULT MARKET — CORE ENGINE
+   PART 1 — AUTH + CORE
+=============================== */
+
+/* ===== FIREBASE CONFIG ===== */
+const firebaseConfig = {
   apiKey: "AIzaSyBfGXL6lKmBTZ9FIxsmsP_-40_-MZ33zBw",
-  authDomain: "gamevaultmarket-5e494.firebaseapp.com",
-  projectId: "gamevaultmarket-5e494"
-});
+  authDomain: "gamevault-market.firebaseapp.com",
+  projectId: "gamevault-market",
+  storageBucket: "gamevault-market.appspot.com",
+  messagingSenderId: "000000000",
+  appId: "1:000000000:web:000000"
+};
+
+firebase.initializeApp(firebaseConfig);
 
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-/* UI */
+/* ===== SUPABASE CONFIG ===== */
+const SUPABASE_URL = "https://pmgmbpwscyrsyrgyqsyy.supabase.co";
+const SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY_HERE"; // replace
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ===== UI ELEMENTS ===== */
 const nav = document.getElementById("nav");
 const sellBtn = document.getElementById("sellBtn");
 const adminBtn = document.getElementById("adminBtn");
-const adminUsers = document.getElementById("adminUsers");
+const paymentDetails = document.getElementById("paymentDetails");
 
-const emailInput = document.getElementById("email");
-const passwordInput = document.getElementById("password");
-const roleSelect = document.getElementById("role");
-
-/* NAVIGATION */
+/* ===== SHOW PAGE ===== */
 function show(id){
-document.querySelectorAll("section").forEach(s=>s.classList.add("hidden"));
-document.getElementById(id).classList.remove("hidden");
+  document.querySelectorAll("section").forEach(s=>s.classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
 }
 
-/* SIGNUP */
+/* ===== SIGNUP ===== */
 async function signup(){
-const email=emailInput.value.trim();
-const pass=passwordInput.value;
-const role=roleSelect.value;
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value.trim();
+  const role = document.getElementById("role").value;
 
-if(pass.length<6) return alert("Password too short");
+  if(!email || !password) return alert("Enter email & password");
 
-const user=await auth.createUserWithEmailAndPassword(email,pass);
+  const cred = await auth.createUserWithEmailAndPassword(email,password);
 
-await db.collection("users").doc(user.user.uid).set({
-email:email,
-role:role,
-verified:false,
-banned:false,
-created:Date.now()
-});
+  await db.collection("users").doc(cred.user.uid).set({
+    email,
+    role,
+    verified:false,
+    payout:false,
+    banned:false,
+    createdAt:Date.now()
+  });
 
-alert("Account created");
+  alert("Account created");
 }
 
-/* LOGIN */
+/* ===== LOGIN ===== */
 async function login(){
-const email=emailInput.value.trim();
-const pass=passwordInput.value;
-await auth.signInWithEmailAndPassword(email,pass);
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value.trim();
+
+  await auth.signInWithEmailAndPassword(email,password);
 }
 
-/* LOGOUT */
+/* ===== LOGOUT ===== */
 function logout(){
-auth.signOut();
+  auth.signOut();
 }
 
-/* AUTH STATE */
+/* ===== AUTH STATE ===== */
 auth.onAuthStateChanged(async user=>{
-if(!user){
-nav.classList.add("hidden");
-show("auth");
-return;
-}
+  if(!user){
+    nav.classList.add("hidden");
+    show("auth");
+    return;
+  }
 
-nav.classList.remove("hidden");
-document.getElementById("auth").classList.add("hidden");
+  nav.classList.remove("hidden");
+  document.getElementById("auth").classList.add("hidden");
 
-const doc=await db.collection("users").doc(user.uid).get();
-const data=doc.data();
+  const snap = await db.collection("users").doc(user.uid).get();
+  if(!snap.exists) return;
 
-sellBtn.classList.add("hidden");
-adminBtn.classList.add("hidden");
+  const data = snap.data();
 
-/* ADMIN */
-if(data.role==="admin"){
-adminBtn.classList.remove("hidden");
-show("admin");
-loadAdmin();
-return;
-}
+  /* RESET BUTTONS */
+  sellBtn.classList.add("hidden");
+  adminBtn.classList.add("hidden");
 
-/* SELLER */
-if(data.role==="seller" && !data.verified){
-show("verify");
-return;
-}
+  /* ADMIN */
+  if(data.role === "admin"){
+    adminBtn.classList.remove("hidden");
+    show("admin");
+    loadAdmin();
+    return;
+  }
 
-if(data.role==="seller" && data.verified){
-sellBtn.classList.remove("hidden");
-}
+  /* SELLER NOT VERIFIED */
+  if(data.role === "seller" && !data.verified){
+    nav.classList.add("hidden");
+    show("verification");
 
-/* NORMAL */
-show("home");
+    paymentDetails.innerHTML = `
+      Skrill: gamevaultmarket@gmail.com<br>
+      USDT ERC20: 0x992d0E36A7409F0c9228B51C6bB8F875b1A4Af3B<br>
+      Grey: 212286724510
+    `;
+    return;
+  }
+
+  /* SELLER VERIFIED BUT NO PAYOUT */
+  if(data.role === "seller" && data.verified && !data.payout){
+    show("payout");
+    return;
+  }
+
+  /* VERIFIED SELLER */
+  if(data.role === "seller" && data.verified){
+    sellBtn.classList.remove("hidden");
+  }
+
+  show("home");
+  loadListings();
 });
 
-/* ADMIN LOAD */
-function loadAdmin(){
-db.collection("users").onSnapshot(snap=>{
-adminUsers.innerHTML="";
-snap.forEach(doc=>{
-const u=doc.data();
-adminUsers.innerHTML+=`
-<div style="background:#1b1f2a;padding:10px;margin:10px 0">
-<b>${u.email}</b><br>
-Role: ${u.role}<br>
-Verified: ${u.verified}
-</div>`;
-});
-});
-}
+/* ===============================
+   PLACEHOLDERS (NEXT PARTS)
+=============================== */
+
+function loadListings(){}
+function createListing(){}
+function submitVerification(){}
+function savePayout(){}
+function loadAdmin(){}
+function openOrders(){}
+function sendMessage(){}
