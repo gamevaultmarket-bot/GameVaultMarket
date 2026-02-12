@@ -1,3 +1,6 @@
+/* ===============================
+   FIREBASE INIT (UNCHANGED)
+=============================== */
 firebase.initializeApp({
   apiKey: "AIzaSyBfGXL6lKmBTZ9FIxsmsP_-40_-MZ33zBw",
   authDomain: "gamevaultmarket-5e494.firebaseapp.com",
@@ -7,6 +10,21 @@ firebase.initializeApp({
 const auth = firebase.auth();
 const db = firebase.firestore();
 
+/* ===============================
+   SUPABASE STORAGE CONFIG
+=============================== */
+
+const SUPABASE_URL = "https://YOUR_PROJECT_ID.supabase.co";
+const SUPABASE_KEY = "YOUR_PUBLIC_ANON_KEY";
+
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* STORAGE BUCKET NAME */
+const BUCKET = "uploads";
+
+/* ===============================
+   PAYMENT DESTINATIONS
+=============================== */
 const PAYMENTS = {
   skrill: "gamevaultmarket@gmail.com",
   usdt: "0x992d0E36A7409F0c9228B51C6bB8F875b1A4Af3B",
@@ -15,57 +33,57 @@ const PAYMENTS = {
 
 let currentChat = null;
 
-/* AUTH */
-function signup() {
-  auth.createUserWithEmailAndPassword(email.value, password.value)
-    .then(r => db.collection("users").doc(r.user.uid).set({
+/* ===============================
+   AUTH
+=============================== */
+async function signup() {
+  try {
+    const r = await auth.createUserWithEmailAndPassword(email.value, password.value);
+
+    await db.collection("users").doc(r.user.uid).set({
       email: email.value,
       role: role.value,
       verified: false,
-      created: new Date()
-    }))
-    .catch(e => alert(e.message));
+      payout: null,
+      created: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    alert("Signup successful");
+  } catch (e) {
+    alert(e.message);
+  }
 }
 
-function login() {
-  auth.signInWithEmailAndPassword(email.value, password.value)
-    .catch(e => alert(e.message));
+async function login() {
+  try {
+    await auth.signInWithEmailAndPassword(email.value, password.value);
+  } catch (e) {
+    alert(e.message);
+  }
 }
 
 function logout() {
-  auth.signOut()
-    .then(() => {
-      // Reset UI to login page
-      document.getElementById("auth").classList.remove("hidden");
-      nav.classList.add("hidden");
-      show("auth"); // show login/signup section
-    })
-    .catch(err => alert(err.message));
+  auth.signOut();
 }
 
-/* AUTH STATE */
+/* ===============================
+   AUTH STATE
+=============================== */
 auth.onAuthStateChanged(async user => {
   if (!user) {
-  nav.classList.add("hidden");
-  show("auth");
-  return;
-}
+    show("auth");
+    return;
+  }
 
-  // Hide login/signup section
-  document.getElementById("auth").classList.add("hidden");
-  nav.classList.remove("hidden");
-
-  // Fetch user data
   const snap = await db.collection("users").doc(user.uid).get();
   if (!snap.exists) return;
 
   const data = snap.data();
 
-  // Reset buttons
   sellBtn.classList.add("hidden");
   adminBtn.classList.add("hidden");
 
-  // Admin
+  /* ADMIN */
   if (data.role === "admin") {
     adminBtn.classList.remove("hidden");
     show("admin");
@@ -73,71 +91,116 @@ auth.onAuthStateChanged(async user => {
     return;
   }
 
-  // Seller not verified
+  /* SELLER NOT VERIFIED */
   if (data.role === "seller" && !data.verified) {
     show("verification");
-    paymentDetails.innerHTML = `
-      Skrill: ${PAYMENTS.skrill}<br>
-      USDT: ${PAYMENTS.usdt}<br>
-      Grey ACH: ${PAYMENTS.grey}
-    `;
     return;
   }
 
-  // Seller verified but payout missing
+  /* PAYOUT REQUIRED */
   if (data.role === "seller" && data.verified && !data.payout) {
     show("payout");
     return;
   }
 
-  // Verified seller or buyer
-  if (data.role === "seller" && data.verified) sellBtn.classList.remove("hidden");
+  if (data.role === "seller") sellBtn.classList.remove("hidden");
 
-  // Finally, show risk page
   show("risk");
 });
 
-/* UI */
-function authSection() {
-  document.getElementById("auth").classList.add("hidden");
-}
-
+/* ===============================
+   SHOW PAGE
+=============================== */
 function show(id) {
   document.querySelectorAll("section").forEach(s => s.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
 }
 
-/* RISK */
-function acceptRisk() {
-  if (!agreeRisk.checked) return alert("Accept risk");
-  show("home");
-  loadListings();
-}
-
-/* VERIFICATION */
+/* ===============================
+   VERIFICATION (ONCE ONLY)
+=============================== */
 async function submitVerification() {
-  const idUrl = idPhotoUrl.value.trim();
-  const selfieUrl = selfiePhotoUrl.value.trim();
 
-  if (!idUrl || !selfieUrl) {
-    alert("Please provide both ID and Selfie image links");
+  const userDoc = await db.collection("users").doc(auth.currentUser.uid).get();
+  const user = userDoc.data();
+
+  if (user.role !== "seller") {
+    alert("Only sellers can verify");
     return;
   }
 
   const uid = auth.currentUser.uid;
+  const ref = db.collection("verifications").doc(uid);
 
-  await db.collection("verifications").doc(uid).set({
+  if ((await ref.get()).exists) {
+    alert("Verification already submitted");
+    return;
+  }
+
+  const idFile = idPhoto.files[0];
+  const selfieFile = selfiePhoto.files[0];
+  const payFile = paymentProof.files[0];
+
+  if (!idFile || !selfieFile || !payFile) {
+    alert("Upload ID, Selfie and Payment Proof");
+    return;
+  }
+
+  alert("Uploading ID...");
+  const idUrl = await uploadFile(idFile, "verification");
+
+  alert("Uploading Selfie...");
+  const selfieUrl = await uploadFile(selfieFile, "verification");
+
+  alert("Uploading Payment Proof...");
+  const payUrl = await uploadFile(payFile, "verification");
+
+  await ref.set({
     seller: uid,
     idPhotoUrl: idUrl,
     selfiePhotoUrl: selfieUrl,
+    paymentProofUrl: payUrl,
     status: "pending",
-    created: new Date()
+    created: firebase.firestore.FieldValue.serverTimestamp()
   });
 
-  alert("Verification submitted. Await admin approval.");
+  alert("Verification submitted");
 }
+/* ===============================
+   LISTINGS CONTROL (ADMIN)
+================================ */
 
-/* PAYOUT */
+db.collection("listings")
+.onSnapshot(snap => {
+
+  adminListings.innerHTML = "<h3>All Listings</h3>";
+
+  if (snap.empty) {
+    adminListings.innerHTML += "<p>No listings</p>";
+    return;
+  }
+
+  snap.forEach(doc => {
+    const d = doc.data();
+
+    adminListings.innerHTML += `
+      <div class="card">
+        <b>${d.game}</b><br>
+        Price: $${d.price}<br>
+        Seller: ${d.seller}<br>
+        Status: ${d.status}<br><br>
+
+        <button onclick="activateListing('${doc.id}')">✅ Activate</button>
+        <button onclick="removeListing('${doc.id}')">❌ Remove</button>
+      </div>
+    `;
+  });
+
+});
+
+/* ===============================
+   PAYOUT SAVE
+=============================== */
 async function savePayout() {
   await db.collection("users").doc(auth.currentUser.uid).update({
     payout: {
@@ -145,197 +208,216 @@ async function savePayout() {
       address: payoutAddress.value
     }
   });
+
   alert("Payout saved");
   show("risk");
 }
 
-/* LISTINGS */
+/* ===============================
+   LISTINGS
+=============================== */
 function loadListings() {
   db.collection("listings").where("status","==","active")
-    .onSnapshot(snap => {
-      listings.innerHTML = "";
-      snap.forEach(doc => {
-        const d = doc.data();
-        const players = d.players?.map(p=>`<span class="tag">${p}</span>`).join(" ") || "";
+  .onSnapshot(snap => {
+    listings.innerHTML = "";
+    snap.forEach(doc => {
+      const d = doc.data();
 
-        listings.innerHTML += `
-          <div class="card">
-            <b>${d.game}</b> - $${d.price}<br>
-            ${players}<br>
-            ${d.screenshot ? `<img src="${d.screenshot}" style="max-width:100%">` : ""}
-            <br><button onclick="buy('${doc.id}')">Buy</button>
-          </div>
-        `;
-      });
+      listings.innerHTML += `
+        <div class="card">
+          <b>${d.game}</b> - $${d.price}<br>
+          <button onclick="buy('${doc.id}')">Buy</button>
+        </div>
+      `;
     });
+  });
 }
-async function activeListing(id) {
-  try {
-    db.collection("listings").doc(id).update({
-      status: "active",
-      approvedAt: new Date()
-    });
-    alert("Listing active");
-  } catch (e) {
-    alert(e.message);
+
+async function createListing() {
+
+  const shotFile = document.getElementById("screenshotFile").files[0];
+  let screenshotUrl = null;
+
+  if (shotFile) {
+    alert("Uploading screenshot...");
+    screenshotUrl = await uploadFile(shotFile, "listings");
   }
-}
 
-/* SELL */
-function createListing() {
-  const list = parsePlayers(players.value);
-  if (!list) return;
-
-  db.collection("listings").add({
+  await db.collection("listings").add({
     game: game.value,
-    details: details.value,
     price: Number(price.value),
-    players: list,
-    screenshot: screenshotUrl.value || null,
     seller: auth.currentUser.uid,
-    status: "active",   // ✅ COMMA FIXED
-    created: new Date()
-  })
-  .then(() => alert("Listing submitted"))
-  .catch(err => alert("Error: " + err.message));
+    screenshot: screenshotUrl,
+    status: "active",
+    created: firebase.firestore.FieldValue.serverTimestamp()
+  });
+
+  alert("Listing created");
 }
-/* BUY */
-function buy(id) {
-  db.collection("orders").add({
+
+/* ===============================
+   BUY → REQUIRE $2 FEE
+=============================== */
+async function buy(id) {
+  const ref = await db.collection("orders").add({
     listingId: id,
     buyer: auth.currentUser.uid,
-    status: "waiting_platform_fee",
-    created: new Date()
+    status: "awaiting_fee",
+    created: firebase.firestore.FieldValue.serverTimestamp()
   });
-  alert("Order created");
+
+  alert("Order created. Pay $2 to unlock seller details.");
 }
 
-/* CHAT */
-function openChat(orderId) {
-  currentChat = orderId;
-  show("chat");
-
-  db.collection("chats").doc(orderId).collection("messages")
-    .orderBy("time")
-    .onSnapshot(snap => {
-      messages.innerHTML = "";
-      snap.forEach(m => messages.innerHTML += `<p>${m.data().text}</p>`);
-    });
+/* ===============================
+   CHAT FILTER (AUTO REMOVE DETAILS)
+=============================== */
+function cleanMessage(text) {
+  const banned = /(whatsapp|telegram|@|http|www|\+233|\d{8,})/gi;
+  return text.replace(banned, "[removed]");
 }
 
-function sendMessage() {
+async function sendMessage() {
   if (!currentChat) return;
-  db.collection("chats").doc(currentChat).collection("messages").add({
-    sender: auth.currentUser.uid,
-    text: msgInput.value,
-    time: new Date()
-  });
-  msgInput.value = "";
-}
 
-/* ADMIN */
-function loadAdmin() {
+  const msg = msgInput.value.trim();
+  const files = chatImages.files;
 
-  /* ===============================
-     SELLER VERIFICATIONS
-  ================================ */
-db.collection("verifications")
-  .where("status", "==", "pending")
-  .onSnapshot(snap => {
-    adminUsers.innerHTML = "";
+  const userDoc = await db.collection("users").doc(auth.currentUser.uid).get();
+  const role = userDoc.data().role;
 
-    if (snap.empty) {
-      adminUsers.innerHTML = "<p>No seller verifications</p>";
+  let imageUrls = [];
+
+  // SELLER CAN SEND MAX 2 IMAGES
+  if (role === "seller" && files.length > 0) {
+
+    if (files.length > 2) {
+      alert("Max 2 images allowed");
       return;
     }
+
+    for (let file of files) {
+      const url = await uploadFile(file, "chat");
+      if (url) imageUrls.push(url);
+    }
+  }
+
+  // BUYER CANNOT SEND IMAGES
+  if (role === "buyer" && files.length > 0) {
+    alert("Buyers cannot send images in chat");
+    return;
+  }
+
+  await db.collection("chats")
+    .doc(currentChat)
+    .collection("messages")
+    .add({
+      sender: auth.currentUser.uid,
+      text: msg,
+      images: imageUrls,
+      time: new Date()
+    });
+
+  msgInput.value = "";
+  chatImages.value = "";
+}
+
+/* ===============================
+   ADMIN PANEL
+=============================== */
+function loadAdmin() {
+
+  /* VERIFICATIONS */
+  db.collection("verifications")
+  .where("status","==","pending")
+  .onSnapshot(snap => {
+    adminUsers.innerHTML = "";
 
     snap.forEach(doc => {
       const v = doc.data();
 
       adminUsers.innerHTML += `
         <div class="card">
-          <b>Seller UID:</b> ${doc.id}<br><br>
-
-          <a href="${v.idPhotoUrl}" target="_blank">🪪 View ID Photo</a><br>
-          <a href="${v.selfiePhotoUrl}" target="_blank">🤳 View Selfie</a><br><br>
-
-          <b>Status:</b> ${v.status}<br><br>
-
-          ${
-            v.status === "approved"
-              ? `<span style="color:lightgreen">✔ Approved</span>`
-              : `<button onclick="approveSeller('${doc.id}')">Approve Seller</button>`
-          }
+          Seller: ${doc.id}<br>
+          <a href="${v.idPhotoUrl}" target="_blank">View ID</a><br>
+          <a href="${v.selfiePhotoUrl}" target="_blank">View Selfie</a><br>
+          <button onclick="approveSeller('${doc.id}')">Approve</button>
         </div>
       `;
     });
   });
 
-  /* ===============================
-     Active LISTINGS
-  ================================ */
-  db.collection("listings")
-  .onSnapshot(snap => {
-    adminOrders.innerHTML = "<h3>All Listings</h3>";
-
-    if (snap.empty) {
-      adminOrders.innerHTML += "<p>No listings</p>";
-      return;
-    }
-
+  /* CHAT SPY */
+  db.collection("chats").onSnapshot(snap => {
+    adminChats.innerHTML = "<h3>Live Chats</h3>";
     snap.forEach(doc => {
-      const d = doc.data();
-
-      adminOrders.innerHTML += `
-        <div class="card">
-          <b>${d.game}</b><br>
-          Price: $${d.price}<br>
-          Seller: ${d.seller}<br>
-          Status: ${d.status}<br><br>
-
-          <button onclick="removeListing('${doc.id}')">
-            ❌ Remove Listing
-          </button>
-        </div>
-      `;
+      adminChats.innerHTML += `<div>${doc.id}</div>`;
     });
   });
-
 }
-async function removeListing(id) {
-  if (!confirm("Remove this listing from buyers?")) return;
 
-  await db.collection("listings").doc(id).update({
-    status: "removed",
-    removedAt: new Date()
-  });
-
-  alert("Listing removed");
-}
 async function approveSeller(uid) {
-  try {
-    await db.collection("users").doc(uid).update({
-      verified: true
-    });
-
-    await db.collection("verifications").doc(uid).update({
-      status: "approved",
-      approvedAt: new Date()
-    });
-
-    alert("Seller verified successfully");
-  } catch (err) {
-    alert("Error verifying seller: " + err.message);
-  }
+  await db.collection("users").doc(uid).update({ verified:true });
+  await db.collection("verifications").doc(uid).update({ status:"approved" });
+  alert("Seller approved");
 }
 
+/* ===============================
+   UPLOAD FILE TO SUPABASE STORAGE
+=============================== */
+async function uploadFile(file, folder = "general") {
+  if (!file) return null;
 
-/* HELPERS */
-function parsePlayers(text) {
-  const arr = text.split(",").map(p=>p.trim()).filter(Boolean);
-  if (arr.length > 12) {
-    alert("Max 12 players");
+  const fileExt = file.name.split(".").pop();
+  const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${fileExt}`;
+  const filePath = `${folder}/${fileName}`;
+
+  const { error } = await supabaseClient.storage
+    .from(BUCKET)
+    .upload(filePath, file);
+
+  if (error) {
+    alert("Upload failed: " + error.message);
     return null;
   }
-  return arr;
+
+  const { data } = supabaseClient.storage
+    .from(BUCKET)
+    .getPublicUrl(filePath);
+
+  return data.publicUrl;
+}
+
+async function submitServiceFee(orderId) {
+
+  const userDoc = await db.collection("users").doc(auth.currentUser.uid).get();
+  const role = userDoc.data().role;
+
+  if (role !== "buyer") {
+    alert("Only buyer can upload service payment proof");
+    return;
+  }
+
+  const file = serviceProof.files[0];
+  if (!file) {
+    alert("Upload payment proof");
+    return;
+  }
+
+  const proofUrl = await uploadFile(file, "payments");
+
+  await db.collection("orders").doc(orderId).update({
+    serviceProof: proofUrl,
+    status: "paid_waiting_seller",
+    paidAt: new Date()
+  });
+
+  alert("Payment proof submitted");
+}
+async function activateListing(id) {
+  await db.collection("listings").doc(id).update({
+    status: "active",
+    approvedAt: new Date()
+  });
+  alert("Listing activated");
 }
