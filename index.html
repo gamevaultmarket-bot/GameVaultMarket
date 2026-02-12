@@ -2,98 +2,78 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GameVault Market</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
-<!-- Supabase -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <link rel="stylesheet" href="style.css">
+
+<!-- SUPABASE -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
 
 <header>
-<h1>GameVault Market</h1>
+  <h1>GameVault Market</h1>
 </header>
 
-<nav id="nav" class="hidden">
-<button onclick="show('home')">Home</button>
-<button id="sellBtn" class="hidden" onclick="show('sell')">Sell</button>
-<button id="adminBtn" class="hidden" onclick="show('admin')">Admin</button>
-<button onclick="logout()">Logout</button>
-</nav>
-
-<div class="container">
-
 <!-- AUTH -->
-<section id="auth">
-<h2>Login / Register</h2>
-<input id="email" placeholder="Email">
-<input id="password" type="password" placeholder="Password">
+<section id="authBox">
+  <h2>Login / Signup</h2>
 
-<select id="role">
-<option value="buyer">Buyer</option>
-<option value="seller">Seller</option>
-</select>
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="password" placeholder="Password">
 
-<button onclick="signup()">Sign Up</button>
-<button onclick="login()">Login</button>
+  <button onclick="signup()">Signup</button>
+  <button onclick="login()">Login</button>
+
+  <p id="authMsg"></p>
 </section>
 
-<!-- VERIFICATION -->
-<section id="verification" class="hidden">
-<h2>Seller Verification ($3)</h2>
+<!-- MAIN APP -->
+<section id="app" class="hidden">
 
-<input type="file" id="idFile" accept="image/*">
-<input type="file" id="selfieFile" accept="image/*">
+  <nav>
+    <button onclick="showPage('market')">Market</button>
+    <button onclick="showPage('sell')" id="sellBtn" class="hidden">Sell</button>
+    <button onclick="showPage('verify')" id="verifyBtn" class="hidden">Become Seller</button>
+    <button onclick="showPage('admin')" id="adminBtn" class="hidden">Admin</button>
+    <button onclick="logout()">Logout</button>
+  </nav>
 
-<button onclick="submitVerification()">Submit</button>
+  <!-- MARKET -->
+  <div id="market" class="page">
+    <h2>Marketplace</h2>
+    <div id="listings"></div>
+  </div>
+
+  <!-- SELL -->
+  <div id="sell" class="page hidden">
+    <h2>Create Listing</h2>
+    <input id="title" placeholder="Title">
+    <input id="price" placeholder="Price USD">
+    <textarea id="desc" placeholder="Description"></textarea>
+    <input type="file" id="image">
+    <button onclick="createListing()">Post Listing</button>
+  </div>
+
+  <!-- VERIFY -->
+  <div id="verify" class="page hidden">
+    <h2>Seller Verification</h2>
+    <input type="file" id="idUpload">
+    <input type="file" id="selfieUpload">
+    <input type="file" id="paymentUpload">
+    <button onclick="submitVerification()">Submit Verification</button>
+  </div>
+
+  <!-- ADMIN -->
+  <div id="admin" class="page hidden">
+    <h2>Admin Panel</h2>
+    <div id="adminData"></div>
+  </div>
+
 </section>
 
-<!-- PAYMENT -->
-<section id="payment" class="hidden">
-  <h2>Payment</h2>
-  <div id="paymentInfo"></div>
-  <button onclick="confirmPayment()">I Have Paid</button>
-  <p id="timer"></p>
-</section>
-
-<!-- HOME -->
-<section id="home" class="hidden">
-<h2>Listings</h2>
-<div id="listings"></div>
-</section>
-
-<!-- SELL -->
-<section id="sell" class="hidden">
-<h2>Create Listing</h2>
-<input id="game" placeholder="Game">
-<textarea id="details" placeholder="Details"></textarea>
-<input id="price" placeholder="Price USD">
-<button onclick="createListing()">Post</button>
-</section>
-
-<section id="chat" class="hidden">
-  <h2>Chat</h2>
-  <div id="messages"></div>
-  <input id="msgInput">
-  <button onclick="sendMessage()">Send</button>
-</section>
-
-<!-- ADMIN -->
-<section id="admin" class="hidden">
-<h2>Admin Panel</h2>
-<div id="adminUsers"></div>
-</section>
-
-</div>
-
-<script src="script.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
