@@ -2,28 +2,32 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GameVault Market</title>
-
-<link rel="stylesheet" href="style.css">
 
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-</head>
 
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<link rel="stylesheet" href="style.css">
+</head>
 <body>
 
 <header>
 <h1>GameVault Market</h1>
+<p>P2P Game Account Marketplace</p>
 </header>
 
 <!-- NAV -->
 <nav id="nav" class="hidden">
-<button onclick="show('home')">Home</button>
-<button id="sellBtn" class="hidden" onclick="show('sell')">Sell</button>
-<button id="adminBtn" class="hidden" onclick="show('admin')">Admin</button>
+<button onclick="showPage('home')">Home</button>
+<button id="sellBtn" class="hidden" onclick="showPage('sell')">Sell</button>
+<button onclick="showPage('orders')">Orders</button>
+<button id="adminBtn" class="hidden" onclick="showPage('admin')">Admin</button>
 <button onclick="logout()">Logout</button>
 </nav>
 
@@ -31,8 +35,9 @@
 
 <!-- AUTH -->
 <section id="auth">
-<h2>Login / Signup</h2>
-<input id="email" type="email" placeholder="Email">
+<h2>Login / Register</h2>
+
+<input id="email" placeholder="Email">
 <input id="password" type="password" placeholder="Password">
 
 <select id="role">
@@ -44,31 +49,83 @@
 <button onclick="login()">Login</button>
 </section>
 
+<!-- VERIFICATION -->
+<section id="verification" class="hidden card">
+<h2>Seller Verification</h2>
+<p>Pay verification fee and upload proof</p>
+
+<textarea id="verifyText" placeholder="Payment note"></textarea>
+
+<input type="file" id="verifyImg1" accept="image/*">
+<input type="file" id="verifyImg2" accept="image/*">
+
+<button onclick="submitVerification()">Submit Verification</button>
+</section>
+
+<!-- PAYOUT -->
+<section id="payout" class="hidden card">
+<h2>Set Payout Method</h2>
+
+<select id="payoutMethod">
+<option>Skrill</option>
+<option>USDT</option>
+<option>Grey</option>
+</select>
+
+<input id="payoutAddress" placeholder="Email / Wallet / Account">
+
+<button onclick="savePayout()">Save</button>
+</section>
+
 <!-- HOME -->
 <section id="home" class="hidden">
-<h2>Welcome</h2>
-<p>Marketplace ready</p>
+<h2>Listings</h2>
+<div id="listings"></div>
 </section>
 
 <!-- SELL -->
-<section id="sell" class="hidden">
-<h2>Seller Area</h2>
-<p>You are verified seller</p>
+<section id="sell" class="hidden card">
+<h2>Create Listing</h2>
+
+<input id="game" placeholder="Game name">
+<textarea id="details" placeholder="Account details"></textarea>
+<input id="price" placeholder="Price USD">
+
+<input type="file" id="listingImg" accept="image/*">
+
+<button onclick="createListing()">Post Listing</button>
+</section>
+
+<!-- ORDERS -->
+<section id="orders" class="hidden">
+<h2>My Orders</h2>
+<div id="ordersList"></div>
+</section>
+
+<!-- CHAT -->
+<section id="chat" class="hidden card">
+<h2>Chat</h2>
+<div id="messages"></div>
+<input id="msgInput" placeholder="Message">
+<button onclick="sendMessage()">Send</button>
 </section>
 
 <!-- ADMIN -->
 <section id="admin" class="hidden">
 <h2>Admin Panel</h2>
-<div id="adminUsers"></div>
-</section>
 
-<!-- VERIFICATION -->
-<section id="verify" class="hidden">
-<h2>Seller Verification Required</h2>
-<p>Pay verification fee to unlock selling</p>
+<h3>Seller Verifications</h3>
+<div id="adminUsers"></div>
+
+<h3>Orders</h3>
+<div id="adminOrders"></div>
 </section>
 
 </div>
+
+<footer>
+<p>GameVault Market ©</p>
+</footer>
 
 <script src="script.js"></script>
 </body>
