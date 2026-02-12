@@ -1,112 +1,48 @@
 body {
   margin:0;
   font-family:Arial;
-  background:#0f2027;
+  background:#0f172a;
   color:#fff;
 }
 
-header, footer {
+header {
   text-align:center;
   padding:15px;
-  background:#0006;
+  background:#020617;
 }
 
 nav {
   display:flex;
-  justify-content:space-around;
-  background:#0008;
+  gap:10px;
+  justify-content:center;
   padding:10px;
+  background:#020617;
 }
 
 button {
   padding:8px 12px;
   border:none;
   border-radius:6px;
-  background:#1e90ff;
+  background:#2563eb;
   color:white;
+  cursor:pointer;
 }
 
-.container {
-  max-width:900px;
-  margin:auto;
-  padding:15px;
-}
-
-.hidden { display:none; }
-
-.card {
-  background:#fff1;
-  padding:15px;
-  border-radius:8px;
-  margin-bottom:10px;
-}
-
-input, textarea, select {
+input, textarea {
   width:100%;
   padding:8px;
-  margin:5px 0;
+  margin:6px 0;
+  border-radius:6px;
+  border:none;
 }
 
-#messages {
-  height:300px;
-  overflow:auto;
-  background:#0004;
-  padding:10px;
-}
+.page { padding:15px; }
+.hidden { display:none; }
 
-.tag {
-  background:#1e90ff;
-  padding:4px 8px;
-  border-radius:10px;
-  margin:3px;
-  display:inline-block;
-  font-size:12px;
-}
-
-/* ===== Smooth UI ===== */
-* {
-  box-sizing: border-box;
-}
-
-button {
-  cursor: pointer;
-  transition: 0.2s;
-}
-
-button:hover {
-  opacity: 0.85;
-  transform: scale(1.02);
-}
-
-/* ===== Inputs ===== */
-input, textarea, select {
-  border-radius: 6px;
-  border: none;
-  outline: none;
-}
-
-/* ===== Cards ===== */
-.card {
-  backdrop-filter: blur(6px);
-  border: 1px solid #ffffff22;
-}
-
-/* ===== Images inside listings ===== */
-.card img {
-  border-radius: 6px;
-  margin-top: 8px;
-  max-height: 220px;
-  object-fit: cover;
-}
-
-/* ===== Mobile Fix ===== */
-@media (max-width:600px) {
-  nav {
-    flex-wrap: wrap;
-    gap: 5px;
-  }
-
-  button {
-    flex: 1 1 45%;
-  }
+#authBox {
+  max-width:400px;
+  margin:40px auto;
+  background:#020617;
+  padding:20px;
+  border-radius:8px;
 }
