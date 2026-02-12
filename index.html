@@ -56,9 +56,14 @@
 
 <textarea id="verifyText" placeholder="Payment note"></textarea>
 
-<input type="file" id="verifyImg1" accept="image/*">
-<input type="file" id="verifyImg2" accept="image/*">
-
+<input type="file" id="idPhoto" accept="image/*">
+<input type="file" id="selfiePhoto" accept="image/*">
+<input type="file" id="paymentProof" accept="image/*">
+<input type="file" id="serviceProof" accept="image/*">
+    
+<!-- LISTING SCREENSHOT -->
+<input type="file" id="screenshotFile" accept="image/*">
+    
 <button onclick="submitVerification()">Submit Verification</button>
 </section>
 
@@ -107,6 +112,7 @@
 <h2>Chat</h2>
 <div id="messages"></div>
 <input id="msgInput" placeholder="Message">
+<input type="file" id="chatImages" accept="image/*" multiple>
 <button onclick="sendMessage()">Send</button>
 </section>
 
@@ -119,6 +125,10 @@
 
 <h3>Orders</h3>
 <div id="adminOrders"></div>
+
+<h3>listings</h3>
+<div id="adminListings"></div>
+
 </section>
 
 </div>
