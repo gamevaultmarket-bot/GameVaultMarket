@@ -38,26 +38,39 @@ function show(id){
 
 /* ===== SIGNUP ===== */
 async function signup(){
-  const email = document.getElementById("email").value.trim();
-  const password = document.getElementById("password").value.trim();
-  const role = document.getElementById("role").value;
+  try{
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value.trim();
+    const role = document.getElementById("role").value;
 
-  if(!email || !password) return alert("Enter email & password");
+    if(!email || !password){
+      alert("Enter email & password");
+      return;
+    }
 
-  const cred = await auth.createUserWithEmailAndPassword(email,password);
+    if(password.length < 6){
+      alert("Password must be at least 6 characters");
+      return;
+    }
 
-  await db.collection("users").doc(cred.user.uid).set({
-    email,
-    role,
-    verified:false,
-    payout:false,
-    banned:false,
-    createdAt:Date.now()
-  });
+    const cred = await auth.createUserWithEmailAndPassword(email,password);
 
-  alert("Account created");
+    await db.collection("users").doc(cred.user.uid).set({
+      email: email,
+      role: role,
+      verified: false,
+      payout: false,
+      banned: false,
+      createdAt: Date.now()
+    });
+
+    alert("Signup successful");
+  }
+  catch(err){
+    console.error(err);
+    alert(err.message);
+  }
 }
-
 /* ===== LOGIN ===== */
 async function login(){
   const email = document.getElementById("email").value.trim();
