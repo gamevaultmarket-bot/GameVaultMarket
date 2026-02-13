@@ -59,13 +59,10 @@
 <input type="file" id="idPhoto" accept="image/*">
 <input type="file" id="selfiePhoto" accept="image/*">
 <input type="file" id="paymentProof" accept="image/*">
-<input type="file" id="serviceProof" accept="image/*">
-    
-<!-- LISTING SCREENSHOT -->
-<input type="file" id="screenshotFile" accept="image/*">
     
 <button onclick="submitVerification()">Submit Verification</button>
 </section>
+
 
 <!-- PAYOUT -->
 <section id="payout" class="hidden card">
@@ -106,6 +103,10 @@
 <h2>My Orders</h2>
 <div id="ordersList"></div>
 </section>
+
+<!-- Buyer uploads service proof when paying for an order -->
+<input type="file" id="serviceProof" accept="image/*">
+<button onclick="submitServiceFee(orderId)">Upload Payment Proof</button>
 
 <!-- CHAT -->
 <section id="chat" class="hidden card">
