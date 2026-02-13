@@ -24,11 +24,29 @@
 
 <!-- NAV -->
 <nav id="nav" class="hidden">
+
 <button onclick="show('home')">Home</button>
-<button id="sellBtn" onclick="show('sell')">Sell</button>
+
+<button id="sellBtn" style="display:none;" onclick="show('sell')">
+Sell
+</button>
+
 <button onclick="show('orders')">Orders</button>
-<button id="adminBtn" style="display:none;" onclick="show('admin')">Admin</button>
+
+<button id="verifyBtn" style="display:none;" onclick="show('verification')">
+Verify
+</button>
+
+<button id="payoutBtn" style="display:none;" onclick="show('payout')">
+Payout
+</button>
+
+<button id="adminBtn" style="display:none;" onclick="show('admin')">
+Admin
+</button>
+
 <button onclick="logout()">Logout</button>
+
 </nav>
 
 <div class="container">
