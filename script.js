@@ -89,25 +89,35 @@ function logout() {
 =============================== */
 auth.onAuthStateChanged(async user => {
 
+  const nav = document.getElementById("nav");
+  const sellBtn = document.getElementById("sellBtn");
+  const adminBtn = document.getElementById("adminBtn");
+  const verifyBtn = document.getElementById("verifyBtn");
+  const payoutBtn = document.getElementById("payoutBtn");
+
+  /* ================= NO USER ================= */
   if (!user) {
-    document.getElementById("nav").classList.add("hidden");
+    nav.classList.add("hidden");
     show("auth");
     return;
   }
 
-  document.getElementById("nav").classList.remove("hidden");
+  nav.classList.remove("hidden");
 
   const snap = await db.collection("users").doc(user.uid).get();
   if (!snap.exists) return;
 
   const data = snap.data();
 
-  sellBtn.classList.add("hidden");
-  adminBtn.classList.add("hidden");
+  /* RESET BUTTONS */
+  sellBtn.style.display = "none";
+  adminBtn.style.display = "none";
+  verifyBtn.style.display = "none";
+  payoutBtn.style.display = "none";
 
   /* ================= ADMIN ================= */
-  if (data.role === "admin") {
-    adminBtn.classList.remove("hidden");
+  if (data.role === "admin" || data.admin === true) {
+    adminBtn.style.display = "inline-block";
     show("admin");
     loadAdmin();
     return;
@@ -115,19 +125,21 @@ auth.onAuthStateChanged(async user => {
 
   /* ================= SELLER NOT VERIFIED ================= */
   if (data.role === "seller" && !data.verified) {
+    verifyBtn.style.display = "inline-block";
     show("verification");
     return;
   }
 
   /* ================= PAYOUT REQUIRED ================= */
   if (data.role === "seller" && data.verified && !data.payout) {
+    payoutBtn.style.display = "inline-block";
     show("payout");
     return;
   }
 
-  /* ================= SELL BUTTON ================= */
-  if (data.role === "seller") {
-    sellBtn.classList.remove("hidden");
+  /* ================= SELLER VERIFIED ================= */
+  if (data.role === "seller" && data.verified) {
+    sellBtn.style.display = "inline-block";
   }
 
   /* ================= DEFAULT ================= */
