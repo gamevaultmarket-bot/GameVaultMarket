@@ -27,7 +27,7 @@
 <button onclick="show('home')">Home</button>
 <button id="sellBtn" onclick="show('sell')">Sell</button>
 <button onclick="show('orders')">Orders</button>
-<button id="adminBtn" onclick="show('admin')">Admin</button>
+<button id="adminBtn" style="display:none;" onclick="show('admin')">Admin</button>
 <button onclick="logout()">Logout</button>
 </nav>
 
@@ -49,20 +49,23 @@
 <button onclick="login()">Login</button>
 </section>
 
-<!-- VERIFICATION -->
+<!-- SELLER VERIFICATION -->
 <section id="verification" class="hidden card">
 <h2>Seller Verification</h2>
-<p>Pay verification fee and upload proof</p>
 
 <textarea id="verifyText" placeholder="Payment note"></textarea>
 
+<p>ID Photo</p>
 <input type="file" id="idPhoto" accept="image/*">
+
+<p>Selfie</p>
 <input type="file" id="selfiePhoto" accept="image/*">
+
+<p>Payment Proof</p>
 <input type="file" id="paymentProof" accept="image/*">
-    
+
 <button onclick="submitVerification()">Submit Verification</button>
 </section>
-
 
 <!-- PAYOUT -->
 <section id="payout" class="hidden card">
@@ -104,21 +107,23 @@
 <div id="ordersList"></div>
 </section>
 
-<!-- Buyer uploads service proof when paying for an order -->
-<input type="file" id="serviceProof" accept="image/*">
-<button onclick="submitServiceFee(orderId)">Upload Payment Proof</button>
-
 <!-- CHAT -->
 <section id="chat" class="hidden card">
 <h2>Chat</h2>
+
 <div id="messages"></div>
+
 <input id="msgInput" placeholder="Message">
+
+<!-- Seller can upload max 2 images, Buyer blocked by JS -->
 <input type="file" id="chatImages" accept="image/*" multiple>
+
 <button onclick="sendMessage()">Send</button>
 </section>
 
 <!-- ADMIN -->
 <section id="admin" class="hidden">
+
 <h2>Admin Panel</h2>
 
 <h3>Seller Verifications</h3>
@@ -127,8 +132,11 @@
 <h3>Orders</h3>
 <div id="adminOrders"></div>
 
-<h3>listings</h3>
+<h3>Listings</h3>
 <div id="adminListings"></div>
+
+<h3>Chat Spy</h3>
+<div id="adminChats"></div>
 
 </section>
 
