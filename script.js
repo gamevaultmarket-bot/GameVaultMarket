@@ -20,7 +20,7 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* STORAGE BUCKET NAME */
-const BUCKET = "uploads";
+const BUCKET = "verification";
 
 /* ===============================
    PAYMENT DESTINATIONS
