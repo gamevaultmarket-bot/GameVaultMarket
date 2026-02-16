@@ -68,22 +68,45 @@ Admin
 </section>
 
 <!-- SELLER VERIFICATION -->
-<section id="verification" class="hidden card">
-<h2>Seller Verification</h2>
+<div class="card" id="verificationBox">
 
-<textarea id="verifyText" placeholder="Payment note"></textarea>
+  <h2>Seller Verification</h2>
 
-<p>ID Photo</p>
-<input type="file" id="idPhoto" accept="image/*">
+  <!-- STEP 1 -->
+  <div style="margin-bottom:15px;">
+    <b>Step 1 — Pay $3 Verification Fee</b><br><br>
 
-<p>Selfie</p>
-<input type="file" id="selfiePhoto" accept="image/*">
+    Pay using one of the methods below:<br><br>
 
-<p>Payment Proof</p>
-<input type="file" id="paymentProof" accept="image/*">
+    <b>Skrill:</b> gamevaultmarket@gmail.com<br>
+    <b>USDT (TRC20):</b> 0x992d0E36A7409F0c9228B51C6bB8F875b1A4Af3B<br>
+    <b>Grey:</b> 212286724510<br><br>
 
-<button onclick="submitVerification()">Submit Verification</button>
-</section>
+    ⚠️ After payment, upload proof below.
+  </div>
+
+  <hr>
+
+  <!-- STEP 2 -->
+  <div style="margin-top:15px;">
+    <b>Step 2 — Upload Documents</b><br><br>
+
+    ID Card / Passport:<br>
+    <input type="file" id="idPhoto" accept="image/*"><br><br>
+
+    Selfie holding ID:<br>
+    <input type="file" id="selfiePhoto" accept="image/*"><br><br>
+
+    Payment Proof Screenshot:<br>
+    <input type="file" id="paymentProof" accept="image/*"><br><br>
+  </div>
+
+  <!-- SUBMIT -->
+  <button onclick="submitVerification()" style="padding:10px 20px;">
+    Submit Verification
+  </button>
+
+</div>
 
 <!-- PAYOUT -->
 <section id="payout" class="hidden card">
