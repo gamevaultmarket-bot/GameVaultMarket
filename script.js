@@ -14,13 +14,18 @@ const db = firebase.firestore();
    SUPABASE STORAGE CONFIG
 =============================== */
 
-const SUPABASE_URL = "https://pmgmbpwscyrsyrgyqsyy.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtZ21icHdzY3lyc3lyZ3lxc3l5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MjAxMTQsImV4cCI6MjA4NTk5NjExNH0.PKF5Rc9LRZLKO7FuALPdSF4kiourN5NgZP6IUgk1BJ0";
+const SUPABASE_URL = "https://ztzdwkyqfffzorwuxbrb.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0emR3a3lxZmZmem9yd3V4YnJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExOTQ4NjYsImV4cCI6MjA4Njc3MDg2Nn0.Yf8CiuUkFcnd3VGLyf8XaEIp_Lfx7PG0yP9bJv5pkdg";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* STORAGE BUCKET NAME */
-const BUCKET = "verification";
+/* STORAGE BUCKET NAMES */
+const BUCKETS = {
+  verification: "verification",   // ID + selfie
+  listings: "listings",
+  chat: "chat",
+  payments: "payments"            // ALL payment proofs here
+};
 
 /* ===============================
    PAYMENT DESTINATIONS
@@ -186,28 +191,27 @@ async function submitVerification() {
     return;
   }
 
-  alert("Uploading ID...");
-  const idUrl = await uploadFile(idFile, "verification");
+alert("Uploading ID...");
+const idUrl = await uploadFile(idFile, BUCKETS.verification);
 
-  alert("Uploading Selfie...");
-  const selfieUrl = await uploadFile(selfieFile, "verification");
+alert("Uploading Selfie...");
+const selfieUrl = await uploadFile(selfieFile, BUCKETS.verification);
 
-  alert("Uploading Payment Proof...");
-  const payUrl = await uploadFile(payFile, "verification");
+alert("Uploading Payment Proof...");
+const paymentProofUrl = await uploadFile(payFile, BUCKETS.payments);
 
-  await ref.set({
-    seller: uid,
-    idPhotoUrl: idUrl,
-    selfiePhotoUrl: selfieUrl,
-    paymentProofUrl: payUrl,
-    status: "pending",
-    created: firebase.firestore.FieldValue.serverTimestamp()
-  });
+await ref.set({
+  seller: uid,
+  idPhotoUrl: idUrl,
+  selfiePhotoUrl: selfieUrl,
+  paymentProofUrl: paymentProofUrl,
+  status: "pending",
+  created: firebase.firestore.FieldValue.serverTimestamp()
+});
 
-  alert("Verification submitted");
+  alert("Verification submitted successfully. Admin will review after confirming your $3 payment.");
 }
 /* =============================== */
-
 
 /* ===============================
    PAYOUT SAVE
@@ -231,7 +235,7 @@ async function createListing() {
 
   if (shotFile) {
     alert("Uploading screenshot...");
-    screenshotUrl = await uploadFile(shotFile, "listings");
+    screenshotUrl = await uploadFile(shotFile, BUCKETS.listings);
   }
 
   await db.collection("listings").add({
@@ -358,7 +362,7 @@ async function sendMessage() {
     }
 
     for (let file of files) {
-      const url = await uploadFile(file, "chat");
+      const url = await uploadFile(file, BUCKETS.chat);
       if (url) imageUrls.push(url);
     }
   }
@@ -503,7 +507,6 @@ db.collection("orders")
       </div>
     `;
   });
-
 });
 
 async function approveSeller(uid) {
@@ -523,15 +526,23 @@ async function removeListing(id) {
 /* ===============================
    UPLOAD FILE TO SUPABASE STORAGE
 =============================== */
-async function uploadFile(file, folder = "general") {
+async function uploadFile(file, bucket) {
   if (!file) return null;
+
+  const user = (await supabaseClient.auth.getUser()).data.user;
+  if (!user) {
+    alert("You must be logged in");
+    return null;
+  }
 
   const fileExt = file.name.split(".").pop();
   const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${fileExt}`;
-  const filePath = `${folder}/${fileName}`;
+
+  // Store inside user folder (good for RLS)
+  const filePath = `${user.id}/${fileName}`;
 
   const { error } = await supabaseClient.storage
-    .from(BUCKET)
+    .from(bucket)   // 🔥 USE PASSED BUCKET
     .upload(filePath, file);
 
   if (error) {
@@ -540,7 +551,7 @@ async function uploadFile(file, folder = "general") {
   }
 
   const { data } = supabaseClient.storage
-    .from(BUCKET)
+    .from(bucket)
     .getPublicUrl(filePath);
 
   return data.publicUrl;
@@ -562,7 +573,7 @@ async function submitServiceFee(orderId) {
     return;
   }
 
-  const proofUrl = await uploadFile(file, "payments");
+  const proofUrl = await uploadFile(file, BUCKETS.payments);
 
   await db.collection("orders").doc(orderId).update({
     serviceProof: proofUrl,
