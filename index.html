@@ -68,7 +68,7 @@ Admin
 </section>
 
 <!-- SELLER VERIFICATION -->
-<div class="card" id="verificationBox">
+<section id="verification" class="card hidden">
 
   <h2>Seller Verification</h2>
 
@@ -106,7 +106,7 @@ Admin
     Submit Verification
   </button>
 
-</div>
+</section>
 
 <!-- PAYOUT -->
 <section id="payout" class="hidden card">
@@ -162,8 +162,16 @@ Admin
 <button onclick="sendMessage()">Send</button>
 </section>
 
+<section id="order" class="hidden">
+  <h2>Order</h2>
+  <div id="orderBox"></div>
+</section>
+
 <!-- ADMIN -->
 <section id="admin" class="hidden">
+  
+<div id="adminStats"></div>
+<div id="adminEarnings"></div>
 
 <h2>Admin Panel</h2>
 
