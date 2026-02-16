@@ -58,14 +58,14 @@ async function signup() {
       email.value.trim(),
       password.value.trim()
     );
-
-    await db.collection("users").doc(r.user.uid).set({
-      email: email.value.trim(),
-      role: role.value,
-      verified: false,
-      payout: null,
-      created: firebase.firestore.FieldValue.serverTimestamp()
-    });
+  await db.collection("users").doc(r.user.uid).set({
+    email: email.value.trim(),
+    role: role.value,
+    verified: false,
+    payout: null,
+    termsAccepted: false,   // 👈 IMPORTANT
+    created: firebase.firestore.FieldValue.serverTimestamp()
+});
 
     alert("Signup successful");
 
@@ -113,6 +113,11 @@ auth.onAuthStateChanged(async user => {
   if (!snap.exists) return;
 
   const data = snap.data();
+/* ================= TERMS CHECK ================= */
+if (!data.termsAccepted) {
+  show("risk");
+  return;
+}
 
   /* RESET BUTTONS */
   sellBtn.style.display = "none";
@@ -165,51 +170,35 @@ function show(id) {
    VERIFICATION (ONCE ONLY)
 =============================== */
 async function submitVerification() {
+  const idFile = document.getElementById("idPhoto").files[0];
+  const selfieFile = document.getElementById("selfiePhoto").files[0];
+  const paymentFile = document.getElementById("paymentProof").files[0];
 
-  const userDoc = await db.collection("users").doc(auth.currentUser.uid).get();
-  const user = userDoc.data();
-
-  if (user.role !== "seller") {
-    alert("Only sellers can verify");
+  if (!idFile || !selfieFile || !paymentFile) {
+    alert("Upload all files");
     return;
   }
 
-  const uid = auth.currentUser.uid;
-  const ref = db.collection("verifications").doc(uid);
+  const idUrl = await uploadFile("verification", idFile);
+  const selfieUrl = await uploadFile("verification", selfieFile);
+  const paymentProofUrl = await uploadFile("payment", paymentFile);
 
-  if ((await ref.get()).exists) {
-    alert("Verification already submitted");
+  // ❗ STOP if upload failed
+  if (!idUrl || !selfieUrl || !paymentProofUrl) {
+    alert("Upload failed — try again");
     return;
   }
 
-  const idFile = idPhoto.files[0];
-  const selfieFile = selfiePhoto.files[0];
-  const payFile = paymentProof.files[0];
+  await db.collection("seller_verifications").add({
+    userId: currentUser.uid,
+    idUrl,
+    selfieUrl,
+    paymentProofUrl,
+    status: "pending",
+    createdAt: new Date()
+  });
 
-  if (!idFile || !selfieFile || !payFile) {
-    alert("Upload ID, Selfie and Payment Proof");
-    return;
-  }
-
-alert("Uploading ID...");
-const idUrl = await uploadFile(idFile, BUCKETS.verification);
-
-alert("Uploading Selfie...");
-const selfieUrl = await uploadFile(selfieFile, BUCKETS.verification);
-
-alert("Uploading Payment Proof...");
-const paymentProofUrl = await uploadFile(payFile, BUCKETS.payments);
-
-await ref.set({
-  seller: uid,
-  idPhotoUrl: idUrl,
-  selfiePhotoUrl: selfieUrl,
-  paymentProofUrl: paymentProofUrl,
-  status: "pending",
-  created: firebase.firestore.FieldValue.serverTimestamp()
-});
-
-  alert("Verification submitted successfully. Admin will review after confirming your $3 payment.");
+  alert("Verification submitted");
 }
 /* =============================== */
 
@@ -230,7 +219,7 @@ async function savePayout() {
 
 async function createListing() {
 
-  const shotFile = document.getElementById("screenshotFile").files[0];
+  const shotFile = document.getElementById("listingImg").files[0];
   let screenshotUrl = null;
 
   if (shotFile) {
@@ -526,23 +515,14 @@ async function removeListing(id) {
 /* ===============================
    UPLOAD FILE TO SUPABASE STORAGE
 =============================== */
-async function uploadFile(file, bucket) {
+async function uploadFile(bucket, file) {
   if (!file) return null;
 
-  const user = (await supabaseClient.auth.getUser()).data.user;
-  if (!user) {
-    alert("You must be logged in");
-    return null;
-  }
+  const filePath = `${currentUser.uid}/${Date.now()}_${file.name}`;
 
-  const fileExt = file.name.split(".").pop();
-  const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${fileExt}`;
-
-  // Store inside user folder (good for RLS)
-  const filePath = `${user.id}/${fileName}`;
-
-  const { error } = await supabaseClient.storage
-    .from(bucket)   // 🔥 USE PASSED BUCKET
+  const { error } = await supabaseClient
+    .storage
+    .from(bucket)
     .upload(filePath, file);
 
   if (error) {
@@ -550,7 +530,8 @@ async function uploadFile(file, bucket) {
     return null;
   }
 
-  const { data } = supabaseClient.storage
+  const { data } = supabaseClient
+    .storage
     .from(bucket)
     .getPublicUrl(filePath);
 
@@ -751,3 +732,36 @@ async function openChat(orderId) {
       messages.scrollTop = messages.scrollHeight;
     });
 }
+async function acceptTerms() {
+  if (!document.getElementById("agreeTerms").checked) {
+    alert("You must agree before continuing");
+    return;
+  }
+
+  await db.collection("users").doc(auth.currentUser.uid).update({
+    termsAccepted: true
+  });
+
+  show("home");
+}
+/* ================= TERMS SCROLL UNLOCK ================= */
+window.addEventListener("load", () => {
+
+  const frame = document.getElementById("termsFrame");
+
+  if (!frame) return;
+
+  frame.onload = () => {
+    const doc = frame.contentWindow.document;
+
+    doc.addEventListener("scroll", () => {
+      const scrollBottom =
+        doc.documentElement.scrollTop + doc.documentElement.clientHeight >=
+        doc.documentElement.scrollHeight - 5;
+
+      if (scrollBottom) {
+        document.getElementById("agreeTerms").disabled = false;
+      }
+    });
+  };
+});
