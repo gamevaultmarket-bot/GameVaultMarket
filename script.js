@@ -439,7 +439,7 @@ db.collection("orders").onSnapshot(snap => {
 });
 
   /* VERIFICATIONS */
-  db.collection("seller_verifications")
+  db.collection("verifications")
   .where("status","==","pending")
   .onSnapshot(snap => {
     adminUsers.innerHTML = "";
@@ -452,7 +452,7 @@ db.collection("orders").onSnapshot(snap => {
           Seller: ${doc.id}<br>
           <a href="${v.idPhotoUrl}" target="_blank">View ID</a><br>
           <a href="${v.selfiePhotoUrl}" target="_blank">View Selfie</a><br>
-          <button onclick="approveSeller('${doc.id}')">Approve</button>
+          <button onclick="approveSeller('${doc.id}','${v.uid}')">Approve</button>
         </div>
       `;
     });
@@ -508,7 +508,7 @@ db.collection("orders")
   });
 });
 
-async function approveSeller(uid) {
+async function approveSeller(docId, uid) {
   await db.collection("users").doc(uid).update({ verified: true });
   await db.collection("verifications").doc(uid).update({ status: "approved" });
   alert("Seller approved");
@@ -752,5 +752,5 @@ async function acceptTerms() {
     termsAccepted: true
   });
 
-  show("home");
+  location.reload(); // 🔁 reload app and re-run auth check
 }
