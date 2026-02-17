@@ -92,6 +92,12 @@ border:1px solid #111;
 margin-bottom:10px;
 }
 
+.chat-img{
+  width:120px;
+  border-radius:6px;
+  margin-top:5px;
+}
+
 .msg{
 padding:6px;
 margin:4px 0;
