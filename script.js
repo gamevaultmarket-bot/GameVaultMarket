@@ -35,7 +35,7 @@ const PAYMENTS = {
   usdt: "0x992d0E36A7409F0c9228B51C6bB8F875b1A4Af3B",
   grey: "212286724510"
 };
-
+let currentUser = null;
 let currentChat = null;
 
 /* ===============================
@@ -94,13 +94,14 @@ function logout() {
 =============================== */
 auth.onAuthStateChanged(async user => {
 
+  currentUser = user;
+
   const nav = document.getElementById("nav");
   const sellBtn = document.getElementById("sellBtn");
   const adminBtn = document.getElementById("adminBtn");
   const verifyBtn = document.getElementById("verifyBtn");
   const payoutBtn = document.getElementById("payoutBtn");
 
-  /* ================= NO USER ================= */
   if (!user) {
     nav.classList.add("hidden");
     show("auth");
@@ -113,11 +114,12 @@ auth.onAuthStateChanged(async user => {
   if (!snap.exists) return;
 
   const data = snap.data();
-/* ================= TERMS CHECK ================= */
-if (!data.termsAccepted) {
-  show("risk");
-  return;
-}
+
+  /* TERMS CHECK */
+  if (!data.termsAccepted) {
+    show("risk");
+    return;
+  }
 
   /* RESET BUTTONS */
   sellBtn.style.display = "none";
@@ -125,7 +127,7 @@ if (!data.termsAccepted) {
   verifyBtn.style.display = "none";
   payoutBtn.style.display = "none";
 
-  /* ================= ADMIN ================= */
+  /* ADMIN */
   if (data.role === "admin" || data.admin === true) {
     adminBtn.style.display = "inline-block";
     show("admin");
@@ -133,29 +135,27 @@ if (!data.termsAccepted) {
     return;
   }
 
-  /* ================= SELLER NOT VERIFIED ================= */
+  /* SELLER NOT VERIFIED */
   if (data.role === "seller" && !data.verified) {
     verifyBtn.style.display = "inline-block";
     show("verification");
     return;
   }
 
-  /* ================= PAYOUT REQUIRED ================= */
+  /* PAYOUT REQUIRED */
   if (data.role === "seller" && data.verified && !data.payout) {
     payoutBtn.style.display = "inline-block";
     show("payout");
     return;
   }
 
-  /* ================= SELLER VERIFIED ================= */
+  /* SELLER VERIFIED */
   if (data.role === "seller" && data.verified) {
     sellBtn.style.display = "inline-block";
   }
 
-  /* ================= DEFAULT ================= */
   show("home");
   loadListings();
-
 });
 
 /* ===============================
@@ -170,32 +170,41 @@ function show(id) {
    VERIFICATION (ONCE ONLY)
 =============================== */
 async function submitVerification() {
+
+  if (!currentUser) return alert("Login first");
+
+  // ❗ CHECK BEFORE SAVING
+  const check = await db.collection("verifications")
+    .where("uid","==",currentUser.uid)
+    .get();
+
+  if (!check.empty) {
+    alert("Verification already submitted");
+    return;
+  }
+
+  alert("Uploading...");
+
   const idFile = document.getElementById("idPhoto").files[0];
   const selfieFile = document.getElementById("selfiePhoto").files[0];
-  const paymentFile = document.getElementById("paymentProof").files[0];
+  const payFile = document.getElementById("paymentProof").files[0];
 
-  if (!idFile || !selfieFile || !paymentFile) {
+  if (!idFile || !selfieFile || !payFile) {
     alert("Upload all files");
     return;
   }
 
-  const idUrl = await uploadFile("verification", idFile);
-  const selfieUrl = await uploadFile("verification", selfieFile);
-  const paymentProofUrl = await uploadFile("payment", paymentFile);
+ const idUrl = await uploadFile(BUCKETS.verification, idFile);
+ const selfieUrl = await uploadFile(BUCKETS.verification, selfieFile);
+ const payUrl = await uploadFile(BUCKETS.payments, payFile);
 
-  // ❗ STOP if upload failed
-  if (!idUrl || !selfieUrl || !paymentProofUrl) {
-    alert("Upload failed — try again");
-    return;
-  }
-
-  await db.collection("seller_verifications").add({
-    userId: currentUser.uid,
-    idUrl,
-    selfieUrl,
-    paymentProofUrl,
+  await db.collection("verifications").add({
+    uid: currentUser.uid,
+    idPhoto: idUrl,
+    selfie: selfieUrl,
+    paymentProof: payUrl,
     status: "pending",
-    createdAt: new Date()
+    createdAt: Date.now()
   });
 
   alert("Verification submitted");
@@ -214,7 +223,7 @@ async function savePayout() {
   });
 
   alert("Payout saved");
-  show("risk");
+  show("home");
 }
 
 async function createListing() {
@@ -224,7 +233,7 @@ async function createListing() {
 
   if (shotFile) {
     alert("Uploading screenshot...");
-    screenshotUrl = await uploadFile(shotFile, BUCKETS.listings);
+    screenshotUrl = await uploadFile(BUCKETS.listings, shotFile);
   }
 
   await db.collection("listings").add({
@@ -351,7 +360,7 @@ async function sendMessage() {
     }
 
     for (let file of files) {
-      const url = await uploadFile(file, BUCKETS.chat);
+      const url = await uploadFile(BUCKETS.chat, file);
       if (url) imageUrls.push(url);
     }
   }
@@ -388,6 +397,7 @@ function loadListings() {
       listings.innerHTML += `
         <div class="card">
           <b>${d.game}</b> - $${d.price}<br>
+          ${d.screenshot ? `<img src="${d.screenshot}">` : ""}
           <button onclick="buy('${doc.id}')">Buy</button>
         </div>
       `;
@@ -429,7 +439,7 @@ db.collection("orders").onSnapshot(snap => {
 });
 
   /* VERIFICATIONS */
-  db.collection("verifications")
+  db.collection("seller_verifications")
   .where("status","==","pending")
   .onSnapshot(snap => {
     adminUsers.innerHTML = "";
@@ -554,7 +564,7 @@ async function submitServiceFee(orderId) {
     return;
   }
 
-  const proofUrl = await uploadFile(file, BUCKETS.payments);
+  const proofUrl = await uploadFile(BUCKETS.payments, file);
 
   await db.collection("orders").doc(orderId).update({
     serviceProof: proofUrl,
@@ -744,24 +754,3 @@ async function acceptTerms() {
 
   show("home");
 }
-/* ================= TERMS SCROLL UNLOCK ================= */
-window.addEventListener("load", () => {
-
-  const frame = document.getElementById("termsFrame");
-
-  if (!frame) return;
-
-  frame.onload = () => {
-    const doc = frame.contentWindow.document;
-
-    doc.addEventListener("scroll", () => {
-      const scrollBottom =
-        doc.documentElement.scrollTop + doc.documentElement.clientHeight >=
-        doc.documentElement.scrollHeight - 5;
-
-      if (scrollBottom) {
-        document.getElementById("agreeTerms").disabled = false;
-      }
-    });
-  };
-});
