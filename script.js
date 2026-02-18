@@ -24,7 +24,7 @@ const BUCKETS = {
   verification: "verification",   // ID + selfie
   listings: "listings",
   chat: "chat",
-  payments: "payments"            // ALL payment proofs here
+  payments: "payment"            // ALL payment proofs here
 };
 
 /* ===============================
@@ -77,6 +77,13 @@ async function signup() {
 async function login() {
   try {
     await auth.signInWithEmailAndPassword(email.value, password.value);
+
+    // 🔑 LOGIN TO SUPABASE TOO
+    await supabaseClient.auth.signInWithPassword({
+      email: email.value.trim(),
+      password: password.value.trim()
+    });
+
   } catch (e) {
     alert(e.message);
   }
