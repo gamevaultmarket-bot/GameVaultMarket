@@ -196,7 +196,7 @@ async function submitVerification() {
 
  const idUrl = await uploadFile(BUCKETS.verification, idFile);
  const selfieUrl = await uploadFile(BUCKETS.verification, selfieFile);
- const payUrl = await uploadFile(BUCKETS.payments, payFile);
+ const payUrl = await uploadFile(BUCKETS.payment, payFile);
 
   await db.collection("verifications").add({
     uid: currentUser.uid,
