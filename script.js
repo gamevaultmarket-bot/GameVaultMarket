@@ -168,22 +168,25 @@ async function submitVerification() {
 
   alert("Uploading...");
   
-  if (!idUrl || !selfieUrl || !payUrl) {
-    alert("Upload failed. Try again.");
-    return;
-  }
-  const idFile = document.getElementById("idPhoto").files[0];
-  const selfieFile = document.getElementById("selfiePhoto").files[0];
-  const payFile = document.getElementById("paymentProof").files[0];
+const idFile = document.getElementById("idPhoto").files[0];
+const selfieFile = document.getElementById("selfiePhoto").files[0];
+const payFile = document.getElementById("paymentProof").files[0];
 
-  const idUrl = await uploadFile("verification", idFile);
-  const selfieUrl = await uploadFile("verification", selfieFile);
-  const payUrl = await uploadFile("payments", payFile);
+if (!idFile || !selfieFile || !payFile) {
+  alert("Upload all files");
+  return;
+}
 
-  if (!idFile || !selfieFile || !payFile) {
-    alert("Upload all files");
-    return;
-  }
+alert("Uploading...");
+
+const idUrl = await uploadFile("verification", idFile);
+const selfieUrl = await uploadFile("verification", selfieFile);
+const payUrl = await uploadFile("payments", payFile);
+
+if (!idUrl || !selfieUrl || !payUrl) {
+  alert("Upload failed");
+  return;
+}
 
   await db.collection("verifications").add({
     uid: currentUser.uid,
@@ -528,7 +531,7 @@ async function removeListing(id) {
 =============================== */
 async function uploadFile(type, file) {
 
-  if (!file.type.startsWith("image/")) {
+  if (!file || !file.type.startsWith("image/")) {
     alert("Only images allowed");
     return null;
   }
@@ -575,12 +578,15 @@ async function submitServiceFee(orderId) {
     return;
   }
 
-  const file = serviceProof.files[0];
-  if (!file) {
-    alert("Upload payment proof");
-    return;
-  }
+  const fileInput = document.getElementById("serviceProof");
 
+if (!fileInput || !fileInput.files.length) {
+  alert("Upload payment proof");
+  return;
+}
+
+ const file = fileInput.files[0];
+  
   const proofUrl = await uploadFile("payments", file);
 
   await db.collection("orders").doc(orderId).update({
