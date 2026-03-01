@@ -11,23 +11,6 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 /* ===============================
-   SUPABASE STORAGE CONFIG
-=============================== */
-
-const SUPABASE_URL = "https://ztzdwkyqfffzorwuxbrb.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0emR3a3lxZmZmem9yd3V4YnJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExOTQ4NjYsImV4cCI6MjA4Njc3MDg2Nn0.Yf8CiuUkFcnd3VGLyf8XaEIp_Lfx7PG0yP9bJv5pkdg";
-
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-/* STORAGE BUCKET NAMES */
-const BUCKETS = {
-  verification: "verification",   // ID + selfie
-  listings: "listings",
-  chat: "chat",
-  payments: "payment"            // ALL payment proofs here
-};
-
-/* ===============================
    PAYMENT DESTINATIONS
 =============================== */
 const PAYMENTS = {
@@ -77,13 +60,6 @@ async function signup() {
 async function login() {
   try {
     await auth.signInWithEmailAndPassword(email.value, password.value);
-
-    // 🔑 LOGIN TO SUPABASE TOO
-    await supabaseClient.auth.signInWithPassword({
-      email: email.value.trim(),
-      password: password.value.trim()
-    });
-
   } catch (e) {
     alert(e.message);
   }
@@ -135,7 +111,7 @@ auth.onAuthStateChanged(async user => {
   payoutBtn.style.display = "none";
 
   /* ADMIN */
-  if (data.role === "admin" || data.admin === true) {
+  if (user.email === "gamevaultmarket@gmail.com") {
     adminBtn.style.display = "inline-block";
     show("admin");
     loadAdmin();
@@ -191,19 +167,23 @@ async function submitVerification() {
   }
 
   alert("Uploading...");
-
+  
+  if (!idUrl || !selfieUrl || !payUrl) {
+    alert("Upload failed. Try again.");
+    return;
+  }
   const idFile = document.getElementById("idPhoto").files[0];
   const selfieFile = document.getElementById("selfiePhoto").files[0];
   const payFile = document.getElementById("paymentProof").files[0];
+
+  const idUrl = await uploadFile("verification", idFile);
+  const selfieUrl = await uploadFile("verification", selfieFile);
+  const payUrl = await uploadFile("payments", payFile);
 
   if (!idFile || !selfieFile || !payFile) {
     alert("Upload all files");
     return;
   }
-
- const idUrl = await uploadFile(BUCKETS.verification, idFile);
- const selfieUrl = await uploadFile(BUCKETS.verification, selfieFile);
- const payUrl = await uploadFile(BUCKETS.payment, payFile);
 
   await db.collection("verifications").add({
     uid: currentUser.uid,
@@ -234,18 +214,21 @@ async function savePayout() {
 }
 
 async function createListing() {
-
+  if (!game.value || !price.value) {
+    alert("Enter game and price");
+    return;
+  }
   const shotFile = document.getElementById("listingImg").files[0];
   let screenshotUrl = null;
 
   if (shotFile) {
     alert("Uploading screenshot...");
-    screenshotUrl = await uploadFile(BUCKETS.listings, shotFile);
+    screenshotUrl = await uploadFile("listings", shotFile);
   }
 
   await db.collection("listings").add({
     game: game.value,
-    price: Number(price.value),
+    price: Number(price.value) || 0,
     seller: auth.currentUser.uid,
     screenshot: screenshotUrl,
     status: "active",
@@ -264,7 +247,10 @@ async function buy(id) {
   if (!listing.exists) return alert("Listing not found");
 
   const data = listing.data();
-
+  if (auth.currentUser.uid === data.seller) {
+    alert("You cannot buy your own listing");
+    return;
+  }
   const ref = await db.collection("orders").add({
     listingId: id,
     buyer: auth.currentUser.uid,
@@ -277,6 +263,7 @@ async function buy(id) {
   openOrder(ref.id);     // OPEN LOCKED PAGE
   watchOrder(ref.id);    // REALTIME UPDATE
 }
+
 async function openOrder(orderId) {
 
   const ref = await db.collection("orders").doc(orderId).get();
@@ -367,7 +354,7 @@ async function sendMessage() {
     }
 
     for (let file of files) {
-      const url = await uploadFile(BUCKETS.chat, file);
+      const url = await uploadFile("chat", file);
       if (url) imageUrls.push(url);
     }
   }
@@ -456,9 +443,9 @@ db.collection("orders").onSnapshot(snap => {
 
       adminUsers.innerHTML += `
         <div class="card">
-          Seller: ${doc.id}<br>
-          <a href="${v.idPhotoUrl}" target="_blank">View ID</a><br>
-          <a href="${v.selfiePhotoUrl}" target="_blank">View Selfie</a><br>
+          Seller: ${v.uid}<br>
+          <a href="${v.idPhoto}" target="_blank">View ID</a><br>
+          <a href="${v.selfie}" target="_blank">View Selfie</a><br>
           <button onclick="approveSeller('${doc.id}','${v.uid}')">Approve</button>
         </div>
       `;
@@ -516,8 +503,15 @@ db.collection("orders")
 });
 
 async function approveSeller(docId, uid) {
-  await db.collection("users").doc(uid).update({ verified: true });
-  await db.collection("verifications").doc(uid).update({ status: "approved" });
+
+  await db.collection("users").doc(uid).update({
+    verified: true
+  });
+
+  await db.collection("verifications").doc(docId).update({
+    status: "approved"
+  });
+
   alert("Seller approved");
 }
 
@@ -530,29 +524,45 @@ async function removeListing(id) {
 }
 
 /* ===============================
-   UPLOAD FILE TO SUPABASE STORAGE
+   UPLOAD FILE TO CLOUDINARY STORAGE
 =============================== */
-async function uploadFile(bucket, file) {
-  if (!file) return null;
+async function uploadFile(type, file) {
 
-  const filePath = `${currentUser.uid}/${Date.now()}_${file.name}`;
-
-  const { error } = await supabaseClient
-    .storage
-    .from(bucket)
-    .upload(filePath, file);
-
-  if (error) {
-    alert("Upload failed: " + error.message);
+  if (!file.type.startsWith("image/")) {
+    alert("Only images allowed");
     return null;
   }
 
-  const { data } = supabaseClient
-    .storage
-    .from(bucket)
-    .getPublicUrl(filePath);
+  if (file.size > 5 * 1024 * 1024) {
+    alert("Max file size is 5MB");
+    return null;
+  }
 
-  return data.publicUrl;
+  const CLOUD_NAME = "dwxgzykij";
+  const PRESET = "gamevault_upload";
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", PRESET);
+  formData.append("folder", "gamevault/" + type);
+
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+    {
+      method: "POST",
+      body: formData
+    }
+  );
+
+  const data = await res.json();
+
+  if (!data.secure_url) {
+    alert("Upload failed");
+    console.log(data);
+    return null;
+  }
+
+  return data.secure_url;
 }
 
 async function submitServiceFee(orderId) {
@@ -571,7 +581,7 @@ async function submitServiceFee(orderId) {
     return;
   }
 
-  const proofUrl = await uploadFile(BUCKETS.payments, file);
+  const proofUrl = await uploadFile("payments", file);
 
   await db.collection("orders").doc(orderId).update({
     serviceProof: proofUrl,
