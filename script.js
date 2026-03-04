@@ -231,7 +231,7 @@ async function createListing() {
 
   await db.collection("listings").add({
     game: game.value,
-    price: Number(price.value) || 0,
+    price: Math.max(1, parseFloat(price.value) || 0),
     seller: auth.currentUser.uid,
     screenshot: screenshotUrl,
     status: "active",
@@ -245,7 +245,25 @@ async function createListing() {
    BUY → REQUIRE $2 FEE
 =============================== */
 async function buy(id) {
+  const check = await db.collection("orders")
+  .where("listingId","==",id)
+  .where("status","in",["awaiting_fee","paid","paid_waiting_seller"])
+  .get();
 
+  if (!check.empty) {
+     alert("This listing already has an active order");
+     return;
+  }
+  
+  const existing = await db.collection("listings")
+ .where("seller","==",auth.currentUser.uid)
+ .where("status","==","active")
+ .get();
+
+ if (existing.size >= 5) {
+    alert("Max 5 active listings allowed");
+    return;
+  }
   const listing = await db.collection("listings").doc(id).get();
   if (!listing.exists) return alert("Listing not found");
 
@@ -268,7 +286,7 @@ async function buy(id) {
 }
 
 async function openOrder(orderId) {
-
+  
   const ref = await db.collection("orders").doc(orderId).get();
   if (!ref.exists) return;
 
@@ -336,13 +354,17 @@ async function sendMessage() {
   if (!currentChat) return;
   
   if (await isChatLocked(currentChat)) {
-  alert("Chat closed — Order finished");
-  return;
-}
+    alert("Chat closed — Order finished");
+    return;
+  }
 
   const msg = msgInput.value.trim();
   const files = chatImages.files;
-
+  
+  if (!msg && files.length === 0) {
+    alert("Message cannot be empty");
+    return;
+  }
   const userDoc = await db.collection("users").doc(auth.currentUser.uid).get();
   const role = userDoc.data().role;
 
@@ -392,7 +414,7 @@ function loadListings() {
       const d = doc.data();
 
       listings.innerHTML += `
-        <div class="card">
+        <div class="listing">
           <b>${d.game}</b> - $${d.price}<br>
           ${d.screenshot ? `<img src="${d.screenshot}">` : ""}
           <button onclick="buy('${doc.id}')">Buy</button>
