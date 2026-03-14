@@ -1,6 +1,9 @@
-/* ===============================
-   FIREBASE INIT
-=============================== */
+/* ================================================
+   GAMEVAULT MARKET — script.js v2
+   Clean rebuild. All previous bugs fixed by design.
+================================================ */
+
+/* ── FIREBASE INIT ────────────────────── */
 firebase.initializeApp({
   apiKey: "AIzaSyBfGXL6lKmBTZ9FIxsmsP_-40_-MZ33zBw",
   authDomain: "gamevaultmarket-5e494.firebaseapp.com",
@@ -8,292 +11,424 @@ firebase.initializeApp({
 });
 
 const auth = firebase.auth();
-const db = firebase.firestore();
+const db   = firebase.firestore();
+
+/* ── CONSTANTS ────────────────────────── */
+const ADMIN_EMAIL   = "gamevaultmarket@gmail.com";
+const CLOUD_NAME    = "dwxgzykij";
+const CLOUD_PRESET  = "gamevault_upload";
+const SERVICE_FEE   = 2;
 
 const PAYMENTS = {
-  skrill: "gamevaultmarket@gmail.com",
-  usdt: "0x992d0E36A7409F0c9228B51C6bB8F875b1A4Af3B",
-  grey: "212286724510"
+  Skrill: "gamevaultmarket@gmail.com",
+  USDT:   "0x992d0E36A7409F0c9228B51C6bB8F875b1A4Af3B",
+  Grey:   "212286724510"
 };
 
+/* ── STATE ────────────────────────────── */
 let currentUser = null;
 let currentChat = null;
+let chatUnsub   = null;   // unsubscribe fn for chat listener
 
-/* ===============================
+/* ═══════════════════════════════════════
+   UI HELPERS
+═══════════════════════════════════════ */
+function show(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+function toggleMenu() {
+  document.getElementById('mobileNav').classList.toggle('hidden');
+}
+
+function closeMenu() {
+  document.getElementById('mobileNav').classList.add('hidden');
+}
+
+function switchAuthTab(tab) {
+  if (tab === 'login') {
+    document.getElementById('loginForm').classList.remove('hidden');
+    document.getElementById('signupForm').classList.add('hidden');
+    document.getElementById('tabLogin').classList.add('active');
+    document.getElementById('tabSignup').classList.remove('active');
+  } else {
+    document.getElementById('signupForm').classList.remove('hidden');
+    document.getElementById('loginForm').classList.add('hidden');
+    document.getElementById('tabSignup').classList.add('active');
+    document.getElementById('tabLogin').classList.remove('active');
+  }
+}
+
+function setMsg(id, text, type) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'status-msg ' + type;
+  el.classList.remove('hidden');
+}
+
+function clearMsg(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.add('hidden');
+}
+
+function statusBadge(status) {
+  const map = {
+    awaiting_fee:       ['gold',  'Awaiting Fee'],
+    paid_waiting_seller:['blue',  'Fee Paid'],
+    paid:               ['blue',  'Paid'],
+    released:           ['green', 'Completed'],
+    cancelled:          ['red',   'Cancelled'],
+    pending:            ['gold',  'Pending'],
+    approved:           ['green', 'Approved'],
+    rejected:           ['red',   'Rejected'],
+    active:             ['green', 'Active'],
+    sold:               ['gray',  'Sold'],
+    removed:            ['red',   'Removed'],
+  };
+  const [color, label] = map[status] || ['gray', status];
+  return `<span class="badge badge-${color}">${label}</span>`;
+}
+
+function adminTab(btn, panelId) {
+  document.querySelectorAll('.atab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.admin-panel').forEach(p => p.classList.add('hidden'));
+  document.getElementById(panelId).classList.remove('hidden');
+}
+
+/* ═══════════════════════════════════════
    AUTH
-=============================== */
+═══════════════════════════════════════ */
 async function signup() {
+  const email    = document.getElementById('signupEmail').value.trim();
+  const password = document.getElementById('signupPassword').value.trim();
+  const role     = document.getElementById('signupRole').value;
+
+  if (!email || !password) return alert('Please fill in all fields.');
+  if (password.length < 6) return alert('Password must be at least 6 characters.');
+
   try {
-    if (!email.value || !password.value || !role.value) {
-      alert("Fill all fields");
-      return;
-    }
-    if (password.value.length < 6) {
-      alert("Password must be at least 6 characters");
-      return;
-    }
-    const r = await auth.createUserWithEmailAndPassword(
-      email.value.trim(),
-      password.value.trim()
-    );
-    await db.collection("users").doc(r.user.uid).set({
-      email: email.value.trim(),
-      role: role.value,
-      verified: false,
-      payout: null,
+    const r = await auth.createUserWithEmailAndPassword(email, password);
+    await db.collection('users').doc(r.user.uid).set({
+      email,
+      role,
+      verified:      false,
+      payout:        null,
       termsAccepted: false,
-      created: firebase.firestore.FieldValue.serverTimestamp()
+      created:       firebase.firestore.FieldValue.serverTimestamp()
     });
-    alert("Signup successful");
   } catch (e) {
     alert(e.message);
   }
 }
 
 async function login() {
+  const email    = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value.trim();
+
+  if (!email || !password) return alert('Please enter your email and password.');
+
   try {
-    await auth.signInWithEmailAndPassword(email.value, password.value);
+    await auth.signInWithEmailAndPassword(email, password);
   } catch (e) {
     alert(e.message);
   }
 }
 
 function logout() {
-  auth.signOut().then(() => {
-    document.getElementById("nav").classList.add("hidden");
-    show("auth");
-  });
+  if (chatUnsub) { chatUnsub(); chatUnsub = null; }
+  auth.signOut();
 }
 
-/* ===============================
-   AUTH STATE
-=============================== */
+/* ═══════════════════════════════════════
+   AUTH STATE OBSERVER
+   FIX: buttons reset BEFORE any early return
+═══════════════════════════════════════ */
 auth.onAuthStateChanged(async user => {
   currentUser = user;
 
-  const nav = document.getElementById("nav");
-  const sellBtn = document.getElementById("sellBtn");
-  const adminBtn = document.getElementById("adminBtn");
-  const verifyBtn = document.getElementById("verifyBtn");
-  const payoutBtn = document.getElementById("payoutBtn");
+  const header   = document.getElementById('appHeader');
+  const sellBtn  = document.getElementById('sellBtn');
+  const adminBtn = document.getElementById('adminBtn');
+  const verifyBtn= document.getElementById('verifyBtn');
+  const payoutBtn= document.getElementById('payoutBtn');
+  const mSellBtn = document.getElementById('mSellBtn');
+  const mAdminBtn= document.getElementById('mAdminBtn');
+  const mVerifyBtn=document.getElementById('mVerifyBtn');
+  const mPayoutBtn=document.getElementById('mPayoutBtn');
 
   if (!user) {
-    nav.classList.add("hidden");
-    show("auth");
+    header.classList.add('hidden');
+    show('auth');
     return;
   }
 
-  nav.classList.remove("hidden");
+  header.classList.remove('hidden');
 
-  // FIX: Reset ALL buttons to hidden BEFORE the termsAccepted check
-  // Previously this reset happened AFTER the terms check, meaning
-  // if terms weren't accepted yet, the reset never ran and buttons
-  // could leak through on subsequent logins
-  sellBtn.style.display  = "none";
-  adminBtn.style.display = "none";
-  verifyBtn.style.display = "none";
-  payoutBtn.style.display = "none";
+  /* Reset ALL nav buttons first — before any early return */
+  [sellBtn, adminBtn, verifyBtn, payoutBtn,
+   mSellBtn, mAdminBtn, mVerifyBtn, mPayoutBtn].forEach(b => {
+    if (b) b.style.display = 'none';
+  });
 
-  const snap = await db.collection("users").doc(user.uid).get();
+  const snap = await db.collection('users').doc(user.uid).get();
   if (!snap.exists) return;
-
   const data = snap.data();
 
+  /* Must accept terms first */
   if (!data.termsAccepted) {
-    show("risk");
-    return;  // buttons stay hidden — correct
+    show('risk');
+    return;
   }
 
-  // Only admin gets the admin button
-  if (user.email === "gamevaultmarket@gmail.com") {
-    adminBtn.style.display = "inline-block";
-    show("admin");
+  /* Admin */
+  if (user.email === ADMIN_EMAIL) {
+    adminBtn.style.display  = 'inline-block';
+    mAdminBtn.style.display = 'block';
+    show('admin');
     loadAdmin();
     return;
   }
 
-  // Seller not verified yet
-  if (data.role === "seller" && !data.verified) {
-    verifyBtn.style.display = "inline-block";
-    show("verification");
+  /* Seller: not yet verified */
+  if (data.role === 'seller' && !data.verified) {
+    verifyBtn.style.display  = 'inline-block';
+    mVerifyBtn.style.display = 'block';
+    show('verification');
     return;
   }
 
-  // Seller verified but no payout set
-  if (data.role === "seller" && data.verified && !data.payout) {
-    payoutBtn.style.display = "inline-block";
-    show("payout");
+  /* Seller: verified but no payout set */
+  if (data.role === 'seller' && data.verified && !data.payout) {
+    payoutBtn.style.display  = 'inline-block';
+    mPayoutBtn.style.display = 'block';
+    show('payout');
     return;
   }
 
-  // Seller fully set up — show Sell button only, never Admin
-  if (data.role === "seller" && data.verified) {
-    sellBtn.style.display = "inline-block";
+  /* Seller: fully set up */
+  if (data.role === 'seller' && data.verified) {
+    sellBtn.style.display  = 'inline-block';
+    mSellBtn.style.display = 'block';
   }
 
-  // Buyers and verified sellers land here — adminBtn stays hidden
-  show("home");
+  /* Everyone lands on home */
+  show('home');
   loadListings();
 });
 
-/* ===============================
-   SHOW PAGE
-=============================== */
-function show(id) {
-  document.querySelectorAll("section").forEach(s => s.classList.add("hidden"));
-  document.getElementById(id).classList.remove("hidden");
-}
-
-/* ===============================
+/* ═══════════════════════════════════════
    TERMS
-=============================== */
+═══════════════════════════════════════ */
 async function acceptTerms() {
-  if (!document.getElementById("agreeTerms").checked) {
-    alert("You must agree before continuing");
+  const cb = document.getElementById('agreeTerms');
+  if (!cb.checked) {
+    alert('Please tick the checkbox to agree before continuing.');
     return;
   }
-  await db.collection("users").doc(auth.currentUser.uid).update({
-    termsAccepted: true
-  });
-  location.reload();
+  try {
+    await db.collection('users').doc(auth.currentUser.uid).update({ termsAccepted: true });
+    location.reload();
+  } catch (e) {
+    alert(e.message);
+  }
 }
 
-/* ===============================
-   VERIFICATION — BUG FIXES:
-   1. Removed duplicate alert("Uploading...")
-   2. File check now happens BEFORE any alert/upload
-=============================== */
+/* ═══════════════════════════════════════
+   VERIFICATION
+   FIX: file check BEFORE upload alert
+   FIX: duplicate submission check
+═══════════════════════════════════════ */
 async function submitVerification() {
-  if (!currentUser) return alert("Login first");
+  if (!currentUser) return alert('Please log in first.');
 
-  const check = await db.collection("verifications")
-    .where("uid", "==", currentUser.uid)
-    .get();
+  const idFile     = document.getElementById('idPhoto').files[0];
+  const selfieFile = document.getElementById('selfiePhoto').files[0];
+  const payFile    = document.getElementById('paymentProof').files[0];
 
-  if (!check.empty) {
-    alert("Verification already submitted");
-    return;
-  }
-
-  const idFile = document.getElementById("idPhoto").files[0];
-  const selfieFile = document.getElementById("selfiePhoto").files[0];
-  const payFile = document.getElementById("paymentProof").files[0];
-
-  // FIX 5: file check before showing any upload alert
   if (!idFile || !selfieFile || !payFile) {
-    alert("Upload all files");
+    setMsg('verifyMsg', 'Please upload all three files before submitting.', 'error');
     return;
   }
 
-  // FIX 1: single alert, shown only once after validation passes
-  alert("Uploading...");
+  const existing = await db.collection('verifications')
+    .where('uid', '==', currentUser.uid).get();
 
-  const idUrl = await uploadFile("verification", idFile);
-  const selfieUrl = await uploadFile("verification", selfieFile);
-  const payUrl = await uploadFile("payments", payFile);
+  if (!existing.empty) {
+    setMsg('verifyMsg', 'Verification already submitted. Please wait for admin review.', 'info');
+    return;
+  }
+
+  setMsg('verifyMsg', 'Uploading files, please wait...', 'info');
+
+  const idUrl     = await uploadFile('verification', idFile);
+  const selfieUrl = await uploadFile('verification', selfieFile);
+  const payUrl    = await uploadFile('payments', payFile);
 
   if (!idUrl || !selfieUrl || !payUrl) {
-    alert("Upload failed");
+    setMsg('verifyMsg', 'Upload failed. Please try again.', 'error');
     return;
   }
 
-  await db.collection("verifications").add({
-    uid: currentUser.uid,
-    idPhoto: idUrl,
-    selfie: selfieUrl,
+  await db.collection('verifications').add({
+    uid:          currentUser.uid,
+    idPhoto:      idUrl,
+    selfie:       selfieUrl,
     paymentProof: payUrl,
-    status: "pending",
-    createdAt: Date.now()
+    status:       'pending',
+    createdAt:    Date.now()
   });
 
-  alert("Verification submitted");
+  setMsg('verifyMsg', 'Verification submitted! Admin will review shortly.', 'success');
 }
 
-/* ===============================
+/* ═══════════════════════════════════════
    PAYOUT
-=============================== */
+═══════════════════════════════════════ */
 async function savePayout() {
-  await db.collection("users").doc(auth.currentUser.uid).update({
-    payout: {
-      method: payoutMethod.value,
-      address: payoutAddress.value
-    }
-  });
-  alert("Payout saved");
-  show("home");
+  const method  = document.getElementById('payoutMethod').value;
+  const address = document.getElementById('payoutAddress').value.trim();
+
+  if (!address) return alert('Please enter your payment address.');
+
+  try {
+    await db.collection('users').doc(auth.currentUser.uid).update({
+      payout: { method, address }
+    });
+    show('home');
+    loadListings();
+  } catch (e) {
+    alert(e.message);
+  }
 }
 
-/* ===============================
-   CREATE LISTING
-   (listing limit check stays here — correct context)
-=============================== */
-async function createListing() {
-  if (!game.value || !price.value) {
-    alert("Enter game and price");
-    return;
-  }
+/* ═══════════════════════════════════════
+   LISTINGS
+   FIX: innerHTML = '' before re-render (no duplicates)
+═══════════════════════════════════════ */
+function loadListings() {
+  db.collection('listings').where('status', '==', 'active')
+    .orderBy('created', 'desc')
+    .onSnapshot(snap => {
+      const grid     = document.getElementById('listings');
+      const noList   = document.getElementById('noListings');
+      const countEl  = document.getElementById('listingCount');
 
-  const existing = await db.collection("listings")
-    .where("seller", "==", auth.currentUser.uid)
-    .where("status", "==", "active")
-    .get();
+      grid.innerHTML = ''; // FIX: clear before rebuild
+
+      if (snap.empty) {
+        noList.classList.remove('hidden');
+        if (countEl) countEl.textContent = '0 active';
+        return;
+      }
+
+      noList.classList.add('hidden');
+      if (countEl) countEl.textContent = snap.size + ' active';
+
+      snap.forEach(doc => {
+        const d = doc.data();
+        const card = document.createElement('div');
+        card.className = 'listing-card';
+        card.innerHTML = `
+          ${d.screenshot
+            ? `<img class="listing-img" src="${d.screenshot}" alt="${d.game}">`
+            : `<div class="listing-img-ph">No image</div>`}
+          <div class="listing-body">
+            <div class="listing-game">${d.game}</div>
+            <div class="listing-details">${d.details || ''}</div>
+            <div class="listing-footer">
+              <span class="listing-price">$${d.price}</span>
+              <button class="btn-primary" onclick="buy('${doc.id}')">Buy</button>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    });
+}
+
+/* ═══════════════════════════════════════
+   CREATE LISTING
+   FIX: max listing check lives here only
+═══════════════════════════════════════ */
+async function createListing() {
+  const game    = document.getElementById('game').value.trim();
+  const details = document.getElementById('details').value.trim();
+  const price   = parseFloat(document.getElementById('price').value);
+  const imgFile = document.getElementById('listingImg').files[0];
+
+  if (!game)       return setMsg('sellMsg', 'Please enter the game name.', 'error');
+  if (!price || price < 1) return setMsg('sellMsg', 'Please enter a valid price.', 'error');
+
+  const existing = await db.collection('listings')
+    .where('seller', '==', auth.currentUser.uid)
+    .where('status', '==', 'active').get();
 
   if (existing.size >= 5) {
-    alert("Max 5 active listings allowed");
+    setMsg('sellMsg', 'Maximum 5 active listings allowed.', 'error');
     return;
   }
 
-  const shotFile = document.getElementById("listingImg").files[0];
-  let screenshotUrl = null;
+  setMsg('sellMsg', 'Posting listing...', 'info');
 
-  if (shotFile) {
-    alert("Uploading screenshot...");
-    screenshotUrl = await uploadFile("listings", shotFile);
+  let screenshotUrl = null;
+  if (imgFile) {
+    screenshotUrl = await uploadFile('listings', imgFile);
   }
 
-  await db.collection("listings").add({
-    game: game.value,
-    price: Math.max(1, parseFloat(price.value) || 0),
-    seller: auth.currentUser.uid,
+  await db.collection('listings').add({
+    game,
+    details,
+    price,
     screenshot: screenshotUrl,
-    status: "active",
-    created: firebase.firestore.FieldValue.serverTimestamp()
+    seller:     auth.currentUser.uid,
+    status:     'active',
+    created:    firebase.firestore.FieldValue.serverTimestamp()
   });
 
-  alert("Listing created");
+  setMsg('sellMsg', 'Listing posted successfully!', 'success');
+  document.getElementById('game').value    = '';
+  document.getElementById('details').value = '';
+  document.getElementById('price').value   = '';
+  document.getElementById('listingImg').value = '';
 }
 
-/* ===============================
-   BUY — BUG FIX 2:
-   Removed misplaced listing-limit check that
-   ran in buyer context using seller query
-=============================== */
-async function buy(id) {
-  const check = await db.collection("orders")
-    .where("listingId", "==", id)
-    .where("status", "in", ["awaiting_fee", "paid", "paid_waiting_seller"])
-    .get();
+/* ═══════════════════════════════════════
+   BUY
+   FIX: removed misplaced seller listing-limit check
+═══════════════════════════════════════ */
+async function buy(listingId) {
+  if (!currentUser) return alert('Please log in first.');
 
-  if (!check.empty) {
-    alert("This listing already has an active order");
-    return;
-  }
-
-  const listing = await db.collection("listings").doc(id).get();
-  if (!listing.exists) return alert("Listing not found");
+  const listing = await db.collection('listings').doc(listingId).get();
+  if (!listing.exists) return alert('Listing not found.');
 
   const data = listing.data();
-  if (auth.currentUser.uid === data.seller) {
-    alert("You cannot buy your own listing");
+
+  if (data.seller === currentUser.uid) {
+    alert('You cannot buy your own listing.');
     return;
   }
 
-  const ref = await db.collection("orders").add({
-    listingId: id,
-    buyer: auth.currentUser.uid,
-    seller: data.seller,
-    price: data.price,
-    status: "awaiting_fee",
+  const active = await db.collection('orders')
+    .where('listingId', '==', listingId)
+    .where('status', 'in', ['awaiting_fee', 'paid_waiting_seller', 'paid'])
+    .get();
+
+  if (!active.empty) {
+    alert('This listing already has an active order.');
+    return;
+  }
+
+  const ref = await db.collection('orders').add({
+    listingId,
+    buyer:   currentUser.uid,
+    seller:  data.seller,
+    game:    data.game,
+    price:   data.price,
+    status:  'awaiting_fee',
     created: firebase.firestore.FieldValue.serverTimestamp()
   });
 
@@ -301,400 +436,539 @@ async function buy(id) {
   watchOrder(ref.id);
 }
 
+/* ═══════════════════════════════════════
+   ORDER DETAIL
+═══════════════════════════════════════ */
 async function openOrder(orderId) {
-  const ref = await db.collection("orders").doc(orderId).get();
-  if (!ref.exists) return;
+  const snap = await db.collection('orders').doc(orderId).get();
+  if (!snap.exists) return;
 
-  const o = ref.data();
-  show("order");
+  const o = snap.data();
+  show('order');
 
-  orderBox.innerHTML = `
-    <div class="card">
-      <b>Order:</b> ${orderId}<br>
-      Status: <b>${o.status}</b><br><br>
-      ${
-        o.status === "awaiting_fee"
-        ? `
-          Seller locked<br><br>
-          Pay $2:<br>
-          Skrill: ${PAYMENTS.skrill}<br>
-          USDT: ${PAYMENTS.usdt}<br>
-          Grey: ${PAYMENTS.grey}<br><br>
-          <input type="file" id="serviceProof"><br><br>
-          <button onclick="submitServiceFee('${orderId}')">Upload Payment Proof</button>
-        `
-        : `
-          Seller unlocked<br><br>
-          <button onclick="openChat('${orderId}')">Open Chat</button>
-        `
-      }
+  const isUnlocked = (o.status !== 'awaiting_fee');
+
+  document.getElementById('orderBox').innerHTML = `
+    <div class="order-detail-card">
+      <div class="order-detail-header">
+        <div>
+          <div class="order-id">ORDER #${orderId.slice(-6).toUpperCase()}</div>
+          <div style="font-size:16px;font-weight:500;margin-top:2px">${o.game}</div>
+        </div>
+        ${statusBadge(o.status)}
+      </div>
+      <div class="order-detail-body">
+        <div style="display:flex;justify-content:space-between;margin-bottom:18px;font-size:13px;color:var(--t2)">
+          <span>Listing price</span>
+          <span style="color:var(--accent);font-family:var(--font-d);font-size:17px">$${o.price}</span>
+        </div>
+
+        ${!isUnlocked ? `
+          <div class="order-locked-notice">
+            <div class="notice-title">&#128274; Seller Contact Locked</div>
+            Pay the $${SERVICE_FEE} service fee to unlock the seller and begin the trade.
+            <br><br>
+            <strong>Skrill:</strong> ${PAYMENTS.Skrill}<br>
+            <strong>USDT TRC20:</strong> ${PAYMENTS.USDT}<br>
+            <strong>Grey:</strong> ${PAYMENTS.Grey}
+          </div>
+          <div class="field" style="margin-bottom:14px">
+            <label class="field-label">Upload Fee Payment Screenshot</label>
+            <input type="file" id="serviceProof" accept="image/*" class="file-input">
+          </div>
+          <button class="btn-primary full" onclick="submitServiceFee('${orderId}')">
+            Submit Fee Proof — Unlock Seller
+          </button>
+        ` : `
+          <div style="padding:14px;background:var(--bg3);border:1px solid var(--borderA);border-radius:var(--r);margin-bottom:16px;font-size:13px;color:var(--t2)">
+            &#128275; Seller unlocked. You can now communicate via chat.
+          </div>
+          <button class="btn-primary full" onclick="openChat('${orderId}','${o.game}')">
+            Open Trade Chat
+          </button>
+        `}
+      </div>
     </div>
   `;
 }
 
 function watchOrder(orderId) {
-  db.collection("orders").doc(orderId).onSnapshot(doc => {
+  db.collection('orders').doc(orderId).onSnapshot(doc => {
     if (!doc.exists) return;
     const status = doc.data().status;
-    if (status === "released" || status === "cancelled") {
-      alert("Order closed");
-      show("home");
+    if (status === 'released' || status === 'cancelled') {
+      alert('This order has been closed.');
+      show('home');
       return;
     }
-    openOrder(orderId);
+    // Re-render order if still on order page
+    const orderSection = document.getElementById('order');
+    if (!orderSection.classList.contains('hidden')) {
+      openOrder(orderId);
+    }
   });
 }
 
-/* ===============================
+/* ═══════════════════════════════════════
+   ORDERS LIST
+═══════════════════════════════════════ */
+function loadOrders() {
+  if (!currentUser) return;
+
+  db.collection('orders')
+    .where('buyer', '==', currentUser.uid)
+    .orderBy('created', 'desc')
+    .onSnapshot(snap => {
+      const list    = document.getElementById('ordersList');
+      const noOrders = document.getElementById('noOrders');
+      list.innerHTML = '';
+
+      if (snap.empty) {
+        noOrders.classList.remove('hidden');
+        return;
+      }
+      noOrders.classList.add('hidden');
+
+      snap.forEach(doc => {
+        const o = doc.data();
+        const card = document.createElement('div');
+        card.className = 'order-card';
+        card.innerHTML = `
+          <div class="order-card-header">
+            <span class="order-id">ORDER #${doc.id.slice(-6).toUpperCase()}</span>
+            ${statusBadge(o.status)}
+          </div>
+          <div class="order-game">${o.game}</div>
+          <div class="order-meta">$${o.price} listing</div>
+          <div class="order-actions">
+            <button class="btn-outline" onclick="openOrder('${doc.id}');watchOrder('${doc.id}')">View Order</button>
+            ${(o.status !== 'awaiting_fee' && o.status !== 'released' && o.status !== 'cancelled')
+              ? `<button class="btn-primary" onclick="openChat('${doc.id}','${o.game}')">Chat</button>`
+              : ''}
+          </div>
+        `;
+        list.appendChild(card);
+      });
+    });
+}
+
+/* ═══════════════════════════════════════
+   SERVICE FEE SUBMISSION
+═══════════════════════════════════════ */
+async function submitServiceFee(orderId) {
+  const file = document.getElementById('serviceProof')?.files[0];
+  if (!file) return alert('Please upload your payment screenshot.');
+
+  const proofUrl = await uploadFile('payments', file);
+  if (!proofUrl) return;
+
+  await db.collection('orders').doc(orderId).update({
+    serviceProof:          proofUrl,
+    status:                'paid_waiting_seller',
+    serviceFeePaidAt:      new Date()
+  });
+
+  alert('Fee proof submitted. Admin will confirm shortly.');
+}
+
+/* ═══════════════════════════════════════
    CHAT
-=============================== */
+═══════════════════════════════════════ */
 function cleanMessage(text) {
-  const banned = /(whatsapp|telegram|@|http|www|\+233|\d{8,})/gi;
-  return text.replace(banned, "[removed]");
+  return text.replace(/(whatsapp|telegram|@|http|www\.|t\.me|\+\d{7,}|\d{9,})/gi, '[removed]');
+}
+
+async function openChat(orderId, gameTitle) {
+  if (!currentUser) return;
+
+  const orderSnap = await db.collection('orders').doc(orderId).get();
+  if (!orderSnap.exists) return alert('Order not found.');
+
+  const o = orderSnap.data();
+
+  if (o.status === 'awaiting_fee') {
+    alert('Please pay the service fee first to unlock chat.');
+    return;
+  }
+  if (o.status === 'released' || o.status === 'cancelled') {
+    alert('This order is closed. Chat is no longer available.');
+    return;
+  }
+
+  // Verify current user is buyer or seller of this order
+  if (o.buyer !== currentUser.uid && o.seller !== currentUser.uid) {
+    alert('You are not part of this order.');
+    return;
+  }
+
+  currentChat = orderId;
+  show('chat');
+
+  document.getElementById('chatTitle').textContent  = gameTitle || 'Trade Chat';
+  document.getElementById('chatStatus').textContent = o.status.replace(/_/g, ' ');
+
+  // Unsubscribe previous listener
+  if (chatUnsub) chatUnsub();
+
+  chatUnsub = db.collection('chats').doc(orderId)
+    .collection('messages')
+    .orderBy('time')
+    .onSnapshot(snap => {
+      const box = document.getElementById('messages');
+      box.innerHTML = '';
+
+      snap.forEach(doc => {
+        const m   = doc.data();
+        const mine = m.sender === currentUser.uid;
+        const div  = document.createElement('div');
+        div.className = 'msg ' + (mine ? 'from-me' : 'from-other');
+
+        let imgs = '';
+        if (m.images && m.images.length > 0) {
+          imgs = m.images.map(u => `<img class="msg-img" src="${u}">`).join('');
+        }
+
+        div.innerHTML = `
+          ${!mine ? `<div class="msg-sender">Seller</div>` : ''}
+          ${m.text ? `<div>${m.text}</div>` : ''}
+          ${imgs}
+        `;
+        box.appendChild(div);
+      });
+
+      box.scrollTop = box.scrollHeight;
+    });
 }
 
 async function sendMessage() {
   if (!currentChat) return;
 
-  if (await isChatLocked(currentChat)) {
-    alert("Chat closed — Order finished");
+  const orderSnap = await db.collection('orders').doc(currentChat).get();
+  if (!orderSnap.exists) return;
+  const status = orderSnap.data().status;
+  if (status === 'released' || status === 'cancelled') {
+    alert('Chat is closed — this order has ended.');
     return;
   }
 
-  const msg = msgInput.value.trim();
-  const files = chatImages.files;
+  const text      = document.getElementById('msgInput').value.trim();
+  const fileInput = document.getElementById('chatImages');
+  const files     = fileInput.files;
 
-  if (!msg && files.length === 0) {
-    alert("Message cannot be empty");
-    return;
-  }
+  if (!text && files.length === 0) return;
 
-  const userDoc = await db.collection("users").doc(auth.currentUser.uid).get();
-  const role = userDoc.data().role;
+  const userSnap = await db.collection('users').doc(currentUser.uid).get();
+  const role     = userSnap.data().role;
 
   let imageUrls = [];
 
-  if (role === "seller" && files.length > 0) {
-    if (files.length > 2) {
-      alert("Max 2 images allowed");
-      return;
-    }
-    for (let file of files) {
-      const url = await uploadFile("chat", file);
+  if (role === 'seller' && files.length > 0) {
+    if (files.length > 2) { alert('Maximum 2 images per message.'); return; }
+    for (const file of files) {
+      const url = await uploadFile('chat', file);
       if (url) imageUrls.push(url);
     }
   }
 
-  if (role === "buyer" && files.length > 0) {
-    alert("Buyers cannot send images in chat");
+  if (role === 'buyer' && files.length > 0) {
+    alert('Buyers cannot send images in chat.');
+    fileInput.value = '';
     return;
   }
 
-  await db.collection("chats")
-    .doc(currentChat)
-    .collection("messages")
-    .add({
-      sender: auth.currentUser.uid,
-      text: cleanMessage(msg),
+  await db.collection('chats').doc(currentChat)
+    .collection('messages').add({
+      sender: currentUser.uid,
+      text:   cleanMessage(text),
       images: imageUrls,
-      time: new Date()
+      time:   new Date()
     });
 
-  msgInput.value = "";
-  chatImages.value = "";
+  document.getElementById('msgInput').value = '';
+  fileInput.value = '';
 }
 
-/* ===============================
-   LISTINGS — BUG FIX 6:
-   innerHTML reset to "" at top of snapshot
-   to prevent duplicate appending on updates
-=============================== */
-function loadListings() {
-  db.collection("listings").where("status", "==", "active")
-    .onSnapshot(snap => {
-      listings.innerHTML = ""; // FIX: clear before re-render
-      snap.forEach(doc => {
-        const d = doc.data();
-        listings.innerHTML += `
-          <div class="listing">
-            <b>${d.game}</b> - $${d.price}<br>
-            ${d.screenshot ? `<img src="${d.screenshot}">` : ""}
-            <button onclick="buy('${doc.id}')">Buy</button>
-          </div>
-        `;
-      });
+/* ═══════════════════════════════════════
+   CLOUDINARY UPLOAD
+═══════════════════════════════════════ */
+async function uploadFile(folder, file) {
+  if (!file) return null;
+
+  if (!file.type.startsWith('image/')) {
+    alert('Only image files are allowed.');
+    return null;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    alert('File must be under 5MB.');
+    return null;
+  }
+
+  const form = new FormData();
+  form.append('file', file);
+  form.append('upload_preset', CLOUD_PRESET);
+  form.append('folder', 'gamevault/' + folder);
+
+  try {
+    const res  = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+      method: 'POST',
+      body:   form
     });
+    const data = await res.json();
+    if (!data.secure_url) throw new Error('No URL returned');
+    return data.secure_url;
+  } catch (e) {
+    alert('Upload failed: ' + e.message);
+    return null;
+  }
 }
 
-/* ===============================
-   ADMIN — BUG FIXES 3 & 4:
-   All onSnapshot listeners moved inside loadAdmin()
-   so they only run for admin users
-=============================== */
+/* ═══════════════════════════════════════
+   ADMIN — all listeners INSIDE loadAdmin()
+   FIX: no global onSnapshot leaks
+═══════════════════════════════════════ */
 function loadAdmin() {
 
-  // FIX 3 & 4: stats, earnings, and orders listeners now inside loadAdmin()
-  db.collection("orders").onSnapshot(snap => {
-    let total = 0, paid = 0, released = 0, cancelled = 0, earnings = 0;
-
+  /* Live stats */
+  db.collection('orders').onSnapshot(snap => {
+    let total = 0, pending = 0, released = 0, cancelled = 0, earnings = 0;
     snap.forEach(doc => {
       const o = doc.data();
       total++;
-      if (o.status === "paid") paid++;
-      if (o.status === "released") released++;
-      if (o.status === "cancelled") cancelled++;
-      if (o.status === "paid" || o.status === "released") earnings += 2;
+      if (o.status === 'paid' || o.status === 'paid_waiting_seller') pending++;
+      if (o.status === 'released') released++;
+      if (o.status === 'cancelled') cancelled++;
+      if (o.status === 'paid' || o.status === 'released') earnings += SERVICE_FEE;
     });
 
-    adminStats.innerHTML = `
-      <div class="card">
-        <b>Orders:</b> ${total} |
-        <span style="color:lightgreen">Paid: ${paid}</span> |
-        <span style="color:cyan">Released: ${released}</span> |
-        <span style="color:red">Cancelled: ${cancelled}</span>
+    document.getElementById('adminStats').innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">Total Orders</div>
+        <div class="stat-value">${total}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Platform Earnings</div>
+        <div class="stat-value green">$${earnings}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Active</div>
+        <div class="stat-value gold">${pending}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Completed</div>
+        <div class="stat-value">${released}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Cancelled</div>
+        <div class="stat-value red">${cancelled}</div>
       </div>
     `;
 
-    adminEarnings.innerHTML = `
-      <div class="card">
-        Platform Earnings: <b>$${earnings}</b>
-      </div>
-    `;
+    /* Orders panel */
+    const panel = document.getElementById('aOrders');
+    panel.innerHTML = '';
+    snap.forEach(doc => {
+      const o = doc.data();
+      const card = document.createElement('div');
+      card.className = 'admin-card';
+      card.innerHTML = `
+        <div class="admin-card-header">
+          <span class="admin-card-id">ORDER #${doc.id.slice(-6).toUpperCase()}</span>
+          ${statusBadge(o.status)}
+        </div>
+        <div class="admin-card-row"><span class="admin-card-key">Game</span><span>${o.game}</span></div>
+        <div class="admin-card-row"><span class="admin-card-key">Price</span><span style="color:var(--accent)">$${o.price}</span></div>
+        <div class="admin-card-row"><span class="admin-card-key">Buyer</span><span style="word-break:break-all;font-size:12px">${o.buyer}</span></div>
+        <div class="admin-card-row"><span class="admin-card-key">Seller</span><span style="word-break:break-all;font-size:12px">${o.seller}</span></div>
+        ${o.serviceProof
+          ? `<div class="admin-card-row"><span class="admin-card-key">Fee Proof</span><a href="${o.serviceProof}" target="_blank">View screenshot</a></div>`
+          : `<div class="admin-card-row"><span class="admin-card-key">Fee Proof</span><span style="color:var(--t3)">Not uploaded yet</span></div>`}
+        <div class="admin-card-actions">
+          <button class="btn-gold" onclick="adminMarkPaid('${doc.id}')">Mark Paid</button>
+          <button class="btn-primary" onclick="adminRelease('${doc.id}','${o.listingId}')">Release</button>
+          <button class="btn-danger" onclick="adminCancel('${doc.id}','${o.listingId}')">Cancel</button>
+        </div>
+      `;
+      panel.appendChild(card);
+    });
+  });
 
-    adminOrders.innerHTML = "<h3>All Orders</h3>";
+  /* Verifications */
+  db.collection('verifications').where('status', '==', 'pending')
+    .onSnapshot(snap => {
+      const panel = document.getElementById('aVerify');
+      panel.innerHTML = '';
+
+      if (snap.empty) {
+        panel.innerHTML = '<div class="empty-state"><div class="empty-icon">&#10003;</div><p>No pending verifications</p></div>';
+        return;
+      }
+
+      snap.forEach(doc => {
+        const v = doc.data();
+        const card = document.createElement('div');
+        card.className = 'admin-card';
+        card.innerHTML = `
+          <div class="admin-card-header">
+            <span class="admin-card-id">SELLER VERIFICATION</span>
+            ${statusBadge('pending')}
+          </div>
+          <div class="admin-card-row"><span class="admin-card-key">User ID</span><span style="word-break:break-all;font-size:12px">${v.uid}</span></div>
+          <div class="admin-card-row">
+            <span class="admin-card-key">Documents</span>
+            <span>
+              <a href="${v.idPhoto}" target="_blank">ID Photo</a> &nbsp;·&nbsp;
+              <a href="${v.selfie}" target="_blank">Selfie</a> &nbsp;·&nbsp;
+              <a href="${v.paymentProof}" target="_blank">Fee Proof</a>
+            </span>
+          </div>
+          <div class="admin-card-actions">
+            <button class="btn-primary" onclick="adminApprove('${doc.id}','${v.uid}')">Approve Seller</button>
+            <button class="btn-danger" onclick="adminRejectVerification('${doc.id}')">Reject</button>
+          </div>
+        `;
+        panel.appendChild(card);
+      });
+    });
+
+  /* Listings */
+  db.collection('listings').orderBy('created', 'desc')
+    .onSnapshot(snap => {
+      const panel = document.getElementById('aListings');
+      panel.innerHTML = '';
+
+      snap.forEach(doc => {
+        const d = doc.data();
+        const card = document.createElement('div');
+        card.className = 'admin-card';
+        card.innerHTML = `
+          <div class="admin-card-header">
+            <span style="font-weight:500">${d.game}</span>
+            ${statusBadge(d.status)}
+          </div>
+          <div class="admin-card-row"><span class="admin-card-key">Price</span><span style="color:var(--accent)">$${d.price}</span></div>
+          <div class="admin-card-row"><span class="admin-card-key">Seller</span><span style="font-size:12px;word-break:break-all">${d.seller}</span></div>
+          ${d.screenshot ? `<div class="admin-card-row"><span class="admin-card-key">Image</span><a href="${d.screenshot}" target="_blank">View</a></div>` : ''}
+          <div class="admin-card-actions">
+            ${d.status !== 'active' ? `<button class="btn-gold" onclick="adminActivateListing('${doc.id}')">Activate</button>` : ''}
+            <button class="btn-danger" onclick="adminRemoveListing('${doc.id}')">Remove</button>
+          </div>
+        `;
+        panel.appendChild(card);
+      });
+    });
+
+  /* Chats */
+  db.collection('chats').onSnapshot(snap => {
+    const panel = document.getElementById('aChats');
+    panel.innerHTML = '';
+
     if (snap.empty) {
-      adminOrders.innerHTML += "<p>No orders</p>";
+      panel.innerHTML = '<div class="empty-state"><p>No active chats</p></div>';
       return;
     }
 
     snap.forEach(doc => {
-      const o = doc.data();
-      adminOrders.innerHTML += `
-        <div class="card">
-          <b>Order ID:</b> ${doc.id}<br>
-          Listing: ${o.listingId}<br>
-          Buyer: ${o.buyer}<br>
-          Seller: ${o.seller}<br>
-          Price: $${o.price}<br>
-          Status: <b>${o.status}</b><br><br>
-          ${
-            o.serviceProof
-            ? `<a href="${o.serviceProof}" target="_blank">View Buyer Proof</a><br><br>`
-            : `<span style="color:red">No proof uploaded</span><br><br>`
-          }
-          <button onclick="markPaid('${doc.id}')">Mark Paid</button>
-          <button onclick="releaseOrder('${doc.id}','${o.listingId}')">Release</button>
-          <button onclick="cancelOrder('${doc.id}','${o.listingId}')">Cancel</button>
+      const div = document.createElement('div');
+      div.className = 'admin-card';
+      div.innerHTML = `
+        <div class="admin-card-row">
+          <span class="admin-card-key">Order</span>
+          <span>#${doc.id.slice(-6).toUpperCase()}</span>
         </div>
+        <div class="admin-card-actions">
+          <button class="btn-outline" onclick="adminViewChat('${doc.id}')">View Messages</button>
+        </div>
+        <div id="chatLog-${doc.id}"></div>
       `;
-    });
-  });
-
-  db.collection("verifications").where("status", "==", "pending")
-    .onSnapshot(snap => {
-      adminUsers.innerHTML = "";
-      snap.forEach(doc => {
-        const v = doc.data();
-        adminUsers.innerHTML += `
-          <div class="card">
-            Seller: ${v.uid}<br>
-            <a href="${v.idPhoto}" target="_blank">View ID</a><br>
-            <a href="${v.selfie}" target="_blank">View Selfie</a><br>
-            <button onclick="approveSeller('${doc.id}','${v.uid}')">Approve</button>
-          </div>
-        `;
-      });
-    });
-
-  db.collection("chats").onSnapshot(snap => {
-    adminChats.innerHTML = "<h3>Live Chats</h3>";
-    snap.forEach(doc => {
-      adminChats.innerHTML += `<div>${doc.id}</div>`;
+      panel.appendChild(div);
     });
   });
 }
 
-async function approveSeller(docId, uid) {
-  await db.collection("users").doc(uid).update({ verified: true });
-  await db.collection("verifications").doc(docId).update({ status: "approved" });
-  alert("Seller approved");
+/* ── Admin actions ────────────────────── */
+async function adminApprove(docId, uid) {
+  await db.collection('users').doc(uid).update({ verified: true });
+  await db.collection('verifications').doc(docId).update({ status: 'approved' });
+  alert('Seller approved.');
 }
 
-async function removeListing(id) {
-  await db.collection("listings").doc(id).update({
-    status: "removed",
-    removedAt: new Date()
+async function adminRejectVerification(docId) {
+  await db.collection('verifications').doc(docId).update({ status: 'rejected' });
+  alert('Verification rejected.');
+}
+
+async function adminMarkPaid(orderId) {
+  await db.collection('orders').doc(orderId).update({ status: 'paid', paidAt: new Date() });
+}
+
+async function adminRelease(orderId, listingId) {
+  const snap = await db.collection('orders').doc(orderId).get();
+  if (!snap.exists) return alert('Order not found.');
+  if (snap.data().status !== 'paid') return alert('Order must be marked PAID before releasing.');
+  await db.collection('orders').doc(orderId).update({ status: 'released', releasedAt: new Date() });
+  await db.collection('listings').doc(listingId).update({ status: 'sold' });
+  alert('Order released. Trade completed.');
+}
+
+async function adminCancel(orderId, listingId) {
+  await db.collection('orders').doc(orderId).update({ status: 'cancelled', cancelledAt: new Date() });
+  if (listingId) {
+    await db.collection('listings').doc(listingId).update({ status: 'active' });
+  }
+  alert('Order cancelled.');
+}
+
+async function adminRemoveListing(id) {
+  await db.collection('listings').doc(id).update({ status: 'removed', removedAt: new Date() });
+}
+
+async function adminActivateListing(id) {
+  await db.collection('listings').doc(id).update({ status: 'active', activatedAt: new Date() });
+}
+
+async function adminViewChat(orderId) {
+  const logEl = document.getElementById('chatLog-' + orderId);
+  if (!logEl) return;
+  logEl.innerHTML = '<div style="font-size:12px;color:var(--t3);padding:10px 0">Loading...</div>';
+
+  const msgs = await db.collection('chats').doc(orderId)
+    .collection('messages').orderBy('time').get();
+
+  if (msgs.empty) {
+    logEl.innerHTML = '<div style="font-size:12px;color:var(--t3);padding:8px 0">No messages yet.</div>';
+    return;
+  }
+
+  logEl.innerHTML = msgs.docs.map(d => {
+    const m = d.data();
+    return `<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span style="color:var(--t3)">${m.sender.slice(0,8)}...</span>
+      <span style="margin-left:8px;color:var(--t2)">${m.text || '[image]'}</span>
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════
+   NAV: load orders on tab click
+═══════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  // Intercept orders nav clicks to also load orders
+  document.querySelectorAll('[onclick*="show(\'orders\')"]').forEach(btn => {
+    const original = btn.getAttribute('onclick');
+    btn.setAttribute('onclick', original + ';loadOrders()');
   });
-  alert("Listing removed");
-}
+});
 
-async function activateListing(id) {
-  await db.collection("listings").doc(id).update({
-    status: "active",
-    approvedAt: new Date()
-  });
-  alert("Listing activated");
-}
-
-async function markPaid(orderId) {
-  await db.collection("orders").doc(orderId).update({
-    status: "paid",
-    paidAt: new Date()
-  });
-  alert("Order marked as PAID");
-}
-
-async function releaseOrder(orderId, listingId) {
-  const orderRef = db.collection("orders").doc(orderId);
-  const order = await orderRef.get();
-
-  if (!order.exists) return alert("Order missing");
-
-  const data = order.data();
-  if (data.status !== "paid") {
-    alert("Order must be PAID before release");
-    return;
-  }
-
-  await orderRef.update({ status: "released", releasedAt: new Date() });
-  await db.collection("listings").doc(listingId).update({ status: "sold" });
-  alert("Order released — Trade completed");
-}
-
-async function cancelOrder(orderId, listingId) {
-  await db.collection("orders").doc(orderId).update({
-    status: "cancelled",
-    cancelledAt: new Date()
-  });
-  await db.collection("listings").doc(listingId).update({ status: "active" });
-  alert("Order cancelled");
-}
-
-/* ===============================
-   UPLOAD FILE
-=============================== */
-async function uploadFile(type, file) {
-  if (!file || !file.type.startsWith("image/")) {
-    alert("Only images allowed");
-    return null;
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    alert("Max file size is 5MB");
-    return null;
-  }
-
-  const CLOUD_NAME = "dwxgzykij";
-  const PRESET = "gamevault_upload";
-
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("upload_preset", PRESET);
-  formData.append("folder", "gamevault/" + type);
-
-  const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-    { method: "POST", body: formData }
-  );
-
-  const data = await res.json();
-  if (!data.secure_url) {
-    alert("Upload failed");
-    console.log(data);
-    return null;
-  }
-  return data.secure_url;
-}
-
-async function submitServiceFee(orderId) {
-  const userDoc = await db.collection("users").doc(auth.currentUser.uid).get();
-  const role = userDoc.data().role;
-
-  if (role !== "buyer") {
-    alert("Only buyer can upload service payment proof");
-    return;
-  }
-
-  const fileInput = document.getElementById("serviceProof");
-  if (!fileInput || !fileInput.files.length) {
-    alert("Upload payment proof");
-    return;
-  }
-
-  const file = fileInput.files[0];
-  const proofUrl = await uploadFile("payments", file);
-
-  await db.collection("orders").doc(orderId).update({
-    serviceProof: proofUrl,
-    status: "paid_waiting_seller",
-    paidAt: new Date()
-  });
-
-  alert("Payment proof submitted");
-}
-
-async function isChatLocked(orderId) {
-  const doc = await db.collection("orders").doc(orderId).get();
-  if (!doc.exists) return true;
-  const status = doc.data().status;
-  return (status === "released" || status === "cancelled");
-}
-
-async function openChat(orderId) {
-  const orderRef = await db.collection("orders").doc(orderId).get();
-  if (!orderRef.exists) {
-    alert("Order not found");
-    return;
-  }
-
-  const order = orderRef.data();
-
-  if (order.status === "awaiting_fee") {
-    alert("Pay $2 service fee first to unlock chat");
-    return;
-  }
-
-  if (order.status === "released" || order.status === "cancelled") {
-    alert("Chat closed — Order finished");
-    return;
-  }
-
-  currentChat = orderId;
-  show("chat");
-
-  db.collection("chats")
-    .doc(orderId)
-    .collection("messages")
-    .orderBy("time")
-    .onSnapshot(snap => {
-      messages.innerHTML = "";
-      snap.forEach(doc => {
-        const m = doc.data();
-        let imgs = "";
-        if (m.images && m.images.length > 0) {
-          imgs = m.images.map(i => `<img src="${i}" class="chat-img">`).join("");
-        }
-        messages.innerHTML += `
-          <div class="msg">
-            <b>${m.sender === auth.currentUser.uid ? "You" : "User"}:</b>
-            ${m.text || ""}
-            <div>${imgs}</div>
-          </div>
-        `;
-      });
-      messages.scrollTop = messages.scrollHeight;
-    });
-}
-
-/* ===============================
-   AUTO CLEAN BROKEN ORDERS
-=============================== */
+/* ═══════════════════════════════════════
+   AUTO-CLEAN BROKEN ORDERS (delayed)
+═══════════════════════════════════════ */
 setTimeout(() => {
-  db.collection("orders").onSnapshot(snap => {
+  db.collection('orders').get().then(snap => {
     snap.forEach(doc => {
       const o = doc.data();
       if (!o.listingId || !o.buyer) {
-        db.collection("orders").doc(doc.id).delete();
+        doc.ref.delete();
       }
     });
   });
-}, 4000);
+}, 5000);
