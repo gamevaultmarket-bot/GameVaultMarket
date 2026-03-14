@@ -1,117 +1,836 @@
-body{
-margin:0;
-font-family:Arial, Helvetica, sans-serif;
-background:#0f1720;
-color:#fff;
+/* ============================================
+   GAMEVAULT MARKET — style.css
+   Aesthetic: Dark industrial / premium gaming
+   Fonts: Rajdhani (display) + DM Sans (body)
+============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=DM+Sans:wght@300;400;500&display=swap');
+
+/* ============================================
+   CSS VARIABLES
+============================================ */
+:root {
+  --bg:         #080c12;
+  --bg-2:       #0d1420;
+  --bg-3:       #111b2a;
+  --bg-card:    #0d1420;
+  --bg-hover:   #14202f;
+
+  --accent:     #00c896;
+  --accent-dim: #009e76;
+  --accent-glow:#00c89622;
+
+  --gold:       #f5a623;
+  --red:        #e53e3e;
+  --blue:       #3b82f6;
+
+  --text:       #e8edf4;
+  --text-2:     #8a9ab5;
+  --text-3:     #4a5a72;
+
+  --border:     #1e2d42;
+  --border-2:   #263548;
+  --border-acc: #00c89640;
+
+  --radius:     6px;
+  --radius-lg:  10px;
+
+  --font-display: 'Rajdhani', sans-serif;
+  --font-body:    'DM Sans', sans-serif;
+
+  --transition: 0.18s ease;
 }
 
-/* HEADER & FOOTER */
-header,footer{
-text-align:center;
-padding:15px;
-background:#020617;
-border-bottom:1px solid #111;
+/* ============================================
+   RESET & BASE
+============================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-/* NAVBAR */
-nav{
-display:flex;
-justify-content:space-around;
-background:#020617;
-padding:10px;
-border-bottom:1px solid #111;
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.6;
+  font-weight: 400;
+  min-height: 100vh;
 }
 
-button{
-padding:10px 14px;
-border:none;
-border-radius:6px;
-background:#2563eb;
-color:#fff;
-cursor:pointer;
+/* Subtle grid texture on body */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.18;
+  pointer-events: none;
+  z-index: 0;
 }
 
-button:hover{
-background:#1d4ed8;
+.container {
+  position: relative;
+  z-index: 1;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 28px 20px 60px;
 }
 
-/* LAYOUT */
-.container{
-max-width:900px;
-margin:auto;
-padding:15px;
+/* ============================================
+   HEADER
+============================================ */
+header {
+  position: relative;
+  z-index: 10;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+  padding: 18px 28px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
-.hidden{
-display:none;
+header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 220px;
+  height: 2px;
+  background: var(--accent);
 }
 
-/* CARD */
-.card{
-background:#020617;
-border:1px solid #111;
-padding:15px;
-border-radius:8px;
-margin-bottom:15px;
+header h1 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+  line-height: 1;
 }
 
-/* INPUTS */
-input,textarea,select{
-width:100%;
-padding:10px;
-margin:6px 0;
-border-radius:6px;
-border:1px solid #111;
-background:#020617;
-color:#fff;
+header h1 span {
+  color: var(--accent);
 }
 
-/* LISTINGS */
-.listing{
-border:1px solid #111;
-padding:12px;
-margin-bottom:10px;
-border-radius:8px;
-background:#020617;
+header p {
+  font-size: 12px;
+  color: var(--text-3);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 500;
+  border-left: 1px solid var(--border-2);
+  padding-left: 14px;
+  margin-left: 4px;
 }
 
-.listing img{
-max-width:100%;
-max-height:220px;
-object-fit:cover;
-border-radius:6px;
-margin-top:8px;
+/* ============================================
+   NAVIGATION
+============================================ */
+nav {
+  position: relative;
+  z-index: 9;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
 }
 
-/* CHAT */
-#messages{
-height:300px;
-overflow-y:auto;
-background:#000814;
-padding:10px;
-border-radius:6px;
-border:1px solid #111;
-margin-bottom:10px;
+nav button {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  padding: 14px 16px 12px;
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition);
+  border-radius: 0;
+  white-space: nowrap;
 }
 
-.chat-img{
-  width:120px;
-  border-radius:6px;
-  margin-top:5px;
+nav button:hover {
+  color: var(--text);
+  background: transparent;
+  border-bottom-color: var(--border-2);
 }
 
-.msg{
-padding:6px;
-margin:4px 0;
-border-radius:6px;
-background:#111827;
+nav button:last-child {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 12px;
 }
 
-/* ADMIN */
-.admin-card{
-border:1px solid #111;
-padding:10px;
-margin-bottom:10px;
-border-radius:6px;
-background:#020617;
+nav button:last-child:hover {
+  color: var(--red);
+  border-bottom-color: var(--red);
+}
+
+/* ============================================
+   SECTION TITLES
+============================================ */
+section h2 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-bottom: 22px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+section h2::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 48px;
+  height: 2px;
+  background: var(--accent);
+}
+
+section h3 {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  margin: 28px 0 14px;
+}
+
+/* ============================================
+   CARDS
+============================================ */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+  margin-bottom: 16px;
+  position: relative;
+  transition: border-color var(--transition);
+}
+
+.card:hover {
+  border-color: var(--border-2);
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent) 0%, transparent 60%);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+.admin-card {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+
+/* ============================================
+   INPUTS, SELECTS, TEXTAREAS
+============================================ */
+input,
+textarea,
+select {
+  width: 100%;
+  padding: 11px 14px;
+  margin: 6px 0 14px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  outline: none;
+  appearance: none;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-3);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent-dim);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238a9ab5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+
+select option {
+  background: var(--bg-2);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 90px;
+}
+
+input[type="file"] {
+  padding: 10px;
+  border-style: dashed;
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+input[type="file"]:hover {
+  border-color: var(--accent-dim);
+  background: var(--bg-hover);
+}
+
+input[type="checkbox"] {
+  width: auto;
+  margin: 0 8px 0 0;
+  accent-color: var(--accent);
+  transform: scale(1.2);
+}
+
+label {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+/* ============================================
+   BUTTONS
+============================================ */
+button {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: background var(--transition), color var(--transition), box-shadow var(--transition), transform 0.1s;
+  position: relative;
+  overflow: hidden;
+}
+
+button:hover {
+  background: var(--accent);
+  color: #000;
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+/* Danger button variant */
+button.danger,
+button[onclick*="cancel"],
+button[onclick*="Cancel"] {
+  border-color: var(--red);
+  color: var(--red);
+}
+button.danger:hover,
+button[onclick*="cancel"]:hover,
+button[onclick*="Cancel"]:hover {
+  background: var(--red);
+  color: #fff;
+  box-shadow: none;
+}
+
+/* Muted/secondary button */
+button.muted {
+  border-color: var(--border-2);
+  color: var(--text-2);
+}
+button.muted:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  box-shadow: none;
+}
+
+/* ============================================
+   AUTH SECTION
+============================================ */
+#auth {
+  max-width: 440px;
+  margin: 48px auto 0;
+  animation: fadeUp 0.4s ease both;
+}
+
+#auth h2 {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+#auth button {
+  width: calc(50% - 6px);
+  margin-top: 4px;
+}
+
+#auth button + button {
+  margin-left: 12px;
+  border-color: var(--border-2);
+  color: var(--text-2);
+}
+
+#auth button + button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  box-shadow: none;
+}
+
+/* ============================================
+   LISTINGS GRID
+============================================ */
+#listings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.listing {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  transition: border-color var(--transition), transform var(--transition);
+  animation: fadeUp 0.3s ease both;
+}
+
+.listing:hover {
+  border-color: var(--border-acc);
+  transform: translateY(-2px);
+}
+
+.listing b {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.listing img {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  margin: 10px 0;
+  border: 1px solid var(--border);
+}
+
+.listing button {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* Price tag */
+.listing .price {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: var(--font-display);
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}
+
+/* ============================================
+   ORDERS LIST
+============================================ */
+#ordersList > div,
+#adminOrders > div.card,
+#adminOrders > div.admin-card {
+  border-left: 3px solid var(--border-2);
+  transition: border-color var(--transition);
+}
+
+#ordersList > div:hover,
+#adminOrders > div:hover {
+  border-left-color: var(--accent);
+}
+
+/* ============================================
+   CHAT
+============================================ */
+#chat.card {
+  max-width: 680px;
+}
+
+#messages {
+  height: 320px;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 14px;
+  scroll-behavior: smooth;
+}
+
+#messages::-webkit-scrollbar {
+  width: 4px;
+}
+
+#messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#messages::-webkit-scrollbar-thumb {
+  background: var(--border-2);
+  border-radius: 2px;
+}
+
+.msg {
+  padding: 10px 14px;
+  margin: 6px 0;
+  border-radius: var(--radius);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  font-size: 14px;
+  line-height: 1.5;
+  animation: fadeUp 0.2s ease both;
+}
+
+.msg b {
+  color: var(--accent);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.chat-img {
+  width: 130px;
+  border-radius: var(--radius);
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+#chat input[type="text"],
+#chat input:not([type="file"]) {
+  margin-bottom: 10px;
+}
+
+#chat .send-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+#chat .send-row input {
+  flex: 1;
+  margin: 0;
+}
+
+/* ============================================
+   VERIFICATION STEPS
+============================================ */
+#verification .step-label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+#verification hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 22px 0;
+}
+
+#verification b {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* Payment info highlight */
+.pay-info {
+  background: var(--bg-3);
+  border: 1px solid var(--border-acc);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin: 12px 0 18px;
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.pay-info b {
+  color: var(--accent);
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+/* ============================================
+   RISK & TERMS
+============================================ */
+#risk .terms-scroll {
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text-2);
+}
+
+#risk .terms-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+#risk .terms-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-2);
+  border-radius: 2px;
+}
+
+#risk .terms-scroll p {
+  margin-bottom: 14px;
+}
+
+#risk .terms-scroll b {
+  color: var(--text);
+  font-weight: 500;
+}
+
+#risk .terms-scroll ul {
+  list-style: none;
+  padding-left: 12px;
+}
+
+#risk .terms-scroll ul li::before {
+  content: '—';
+  color: var(--accent);
+  margin-right: 8px;
+}
+
+/* ============================================
+   STATUS BADGES
+============================================ */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-family: var(--font-display);
+}
+
+.badge-green  { background: #00c89620; color: var(--accent); border: 1px solid #00c89640; }
+.badge-gold   { background: #f5a62320; color: var(--gold);   border: 1px solid #f5a62340; }
+.badge-red    { background: #e53e3e20; color: var(--red);    border: 1px solid #e53e3e40; }
+.badge-blue   { background: #3b82f620; color: var(--blue);   border: 1px solid #3b82f640; }
+.badge-gray   { background: #1e2d42;   color: var(--text-3); border: 1px solid var(--border); }
+
+/* ============================================
+   ADMIN PANEL
+============================================ */
+#adminStats .card,
+#adminEarnings .card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px;
+  font-size: 14px;
+  margin-right: 12px;
+  margin-bottom: 16px;
+}
+
+#adminEarnings .card {
+  border-color: var(--border-acc);
+}
+
+#adminEarnings .card b {
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+#adminOrders .card b,
+#adminUsers .card b {
+  color: var(--text-2);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+#adminOrders .card a,
+#adminUsers .card a {
+  color: var(--blue);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+#adminOrders .card a:hover,
+#adminUsers .card a:hover {
+  text-decoration: underline;
+}
+
+#adminOrders button,
+#adminUsers button {
+  margin-right: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+  padding: 7px 14px;
+}
+
+/* ============================================
+   ORDER BOX
+============================================ */
+#orderBox .card {
+  max-width: 480px;
+  line-height: 2;
+}
+
+#orderBox .card b {
+  color: var(--text-2);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+#orderBox input[type="file"] {
+  margin: 12px 0;
+}
+
+/* ============================================
+   FOOTER
+============================================ */
+footer {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--text-3);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ============================================
+   UTILITIES
+============================================ */
+.hidden { display: none !important; }
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: opacity var(--transition);
+}
+
+a:hover { opacity: 0.8; }
+
+b, strong { color: var(--text); font-weight: 500; }
+
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 18px 0;
+}
+
+/* ============================================
+   ANIMATIONS
+============================================ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+section:not(.hidden) {
+  animation: fadeUp 0.3s ease both;
+}
+
+/* ============================================
+   SCROLLBAR (global)
+============================================ */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+/* ============================================
+   RESPONSIVE
+============================================ */
+@media (max-width: 600px) {
+  header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 14px 18px;
+  }
+
+  header p {
+    border-left: none;
+    padding-left: 0;
+    margin-left: 0;
+  }
+
+  #listings {
+    grid-template-columns: 1fr;
+  }
+
+  #auth button {
+    width: 100%;
+    margin-left: 0 !important;
+    margin-top: 8px;
+  }
+
+  .container {
+    padding: 18px 14px 50px;
+  }
 }
