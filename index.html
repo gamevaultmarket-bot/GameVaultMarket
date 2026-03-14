@@ -4,236 +4,289 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GameVault Market</title>
-
-<!-- Firebase -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Sora:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
-<!-- Supabase -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<header>
-<h1>GameVault Market</h1>
-<p>P2P Game Account Marketplace</p>
+<header id="appHeader" class="hidden">
+  <div class="header-inner">
+    <div class="logo">GAME<span>VAULT</span></div>
+    <nav id="nav">
+      <button class="nav-btn" onclick="show('home')">Home</button>
+      <button class="nav-btn" id="sellBtn" style="display:none" onclick="show('sell')">Sell</button>
+      <button class="nav-btn" onclick="show('orders')">Orders</button>
+      <button class="nav-btn" id="verifyBtn" style="display:none" onclick="show('verification')">Verify</button>
+      <button class="nav-btn" id="payoutBtn" style="display:none" onclick="show('payout')">Payout</button>
+      <button class="nav-btn admin-btn" id="adminBtn" style="display:none" onclick="show('admin')">Admin</button>
+      <button class="nav-btn logout-btn" onclick="logout()">Logout</button>
+    </nav>
+    <button class="hamburger" onclick="toggleMenu()">&#9776;</button>
+  </div>
+  <div class="mobile-nav hidden" id="mobileNav">
+    <button onclick="show('home');closeMenu()">Home</button>
+    <button id="mSellBtn" style="display:none" onclick="show('sell');closeMenu()">Sell</button>
+    <button onclick="show('orders');closeMenu()">Orders</button>
+    <button id="mVerifyBtn" style="display:none" onclick="show('verification');closeMenu()">Verify</button>
+    <button id="mPayoutBtn" style="display:none" onclick="show('payout');closeMenu()">Payout</button>
+    <button id="mAdminBtn" class="admin-btn" style="display:none" onclick="show('admin');closeMenu()">Admin</button>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
 </header>
 
-<!-- NAV -->
-<nav id="nav" class="hidden">
+<main class="main">
 
-<button onclick="show('home')">Home</button>
+  <!-- AUTH -->
+  <section id="auth" class="page">
+    <div class="auth-wrap">
+      <div class="auth-logo">GAME<span>VAULT</span></div>
+      <p class="auth-sub">P2P Game Account Marketplace</p>
+      <div class="tab-switch">
+        <button class="tab-btn active" id="tabLogin" onclick="switchAuthTab('login')">Login</button>
+        <button class="tab-btn" id="tabSignup" onclick="switchAuthTab('signup')">Sign Up</button>
+      </div>
+      <div id="loginForm">
+        <div class="field">
+          <label class="field-label">Email</label>
+          <input id="loginEmail" type="email" placeholder="you@email.com">
+        </div>
+        <div class="field">
+          <label class="field-label">Password</label>
+          <input id="loginPassword" type="password" placeholder="••••••••">
+        </div>
+        <button class="btn-primary full" onclick="login()">Login</button>
+      </div>
+      <div id="signupForm" class="hidden">
+        <div class="field">
+          <label class="field-label">Email</label>
+          <input id="signupEmail" type="email" placeholder="you@email.com">
+        </div>
+        <div class="field">
+          <label class="field-label">Password <span class="field-hint">(min 6 chars)</span></label>
+          <input id="signupPassword" type="password" placeholder="••••••••">
+        </div>
+        <div class="field">
+          <label class="field-label">I want to</label>
+          <select id="signupRole">
+            <option value="buyer">Buy game accounts</option>
+            <option value="seller">Sell game accounts</option>
+          </select>
+        </div>
+        <button class="btn-primary full" onclick="signup()">Create Account</button>
+      </div>
+    </div>
+  </section>
 
-<button id="sellBtn" style="display:none;" onclick="show('sell')">
-Sell
-</button>
+  <!-- TERMS -->
+  <section id="risk" class="page hidden">
+    <div class="page-card">
+      <h2 class="page-title">Terms &amp; Risk Agreement</h2>
+      <div class="terms-box">
+        <div class="terms-section">
+          <div class="terms-heading">1. Platform Role</div>
+          <p>GameVault Market only connects buyers and sellers. We do NOT own, sell, or guarantee any game accounts.</p>
+        </div>
+        <div class="terms-section">
+          <div class="terms-heading">2. No Warranty</div>
+          <p>We are not responsible for account bans, recoveries, scams, or losses outside platform protection.</p>
+        </div>
+        <div class="terms-section">
+          <div class="terms-heading">3. Payments</div>
+          <p>All fees paid (verification &amp; service fee) are <strong>NON-REFUNDABLE</strong>.</p>
+        </div>
+        <div class="terms-section">
+          <div class="terms-heading">4. Forbidden Actions</div>
+          <ul class="terms-list">
+            <li>No scamming or fraudulent activity</li>
+            <li>No chargebacks</li>
+            <li>No sharing personal contacts (WhatsApp, Telegram, etc.)</li>
+            <li>No bypassing the GameVault system</li>
+          </ul>
+        </div>
+        <div class="terms-section">
+          <div class="terms-heading">5. Ban Policy</div>
+          <p>Violating rules results in permanent ban and account freeze.</p>
+        </div>
+        <div class="terms-section">
+          <div class="terms-heading">6. Risk Notice</div>
+          <p>Trading game accounts always carries risk. You agree to trade at your own responsibility.</p>
+        </div>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="agreeTerms">
+        <label for="agreeTerms">I have read and agree to the Terms &amp; Risk Agreement</label>
+      </div>
+      <button class="btn-primary full" onclick="acceptTerms()">Continue to GameVault</button>
+    </div>
+  </section>
 
-<button onclick="show('orders')">Orders</button>
+  <!-- VERIFICATION -->
+  <section id="verification" class="page hidden">
+    <div class="page-card">
+      <h2 class="page-title">Seller Verification</h2>
+      <p class="page-sub">Complete both steps to start selling</p>
+      <div class="step-block">
+        <div class="step-header">
+          <span class="step-num">01</span>
+          <span class="step-title">Pay $3 Verification Fee</span>
+        </div>
+        <div class="pay-methods">
+          <div class="pay-method">
+            <span class="pay-label">Skrill</span>
+            <span class="pay-value">gamevaultmarket@gmail.com</span>
+          </div>
+          <div class="pay-method">
+            <span class="pay-label">USDT TRC20</span>
+            <span class="pay-value">0x992d0E36A7409F0c9228B51C6bB8F875b1A4Af3B</span>
+          </div>
+          <div class="pay-method">
+            <span class="pay-label">Grey</span>
+            <span class="pay-value">212286724510</span>
+          </div>
+        </div>
+      </div>
+      <div class="step-block">
+        <div class="step-header">
+          <span class="step-num">02</span>
+          <span class="step-title">Upload Documents</span>
+        </div>
+        <div class="upload-grid">
+          <div class="upload-field">
+            <div class="upload-label">ID Card / Passport</div>
+            <input type="file" id="idPhoto" accept="image/*" class="file-input">
+          </div>
+          <div class="upload-field">
+            <div class="upload-label">Selfie Holding ID</div>
+            <input type="file" id="selfiePhoto" accept="image/*" class="file-input">
+          </div>
+          <div class="upload-field">
+            <div class="upload-label">Payment Proof Screenshot</div>
+            <input type="file" id="paymentProof" accept="image/*" class="file-input">
+          </div>
+        </div>
+      </div>
+      <div id="verifyMsg" class="status-msg hidden"></div>
+      <button class="btn-primary full" onclick="submitVerification()">Submit Verification</button>
+    </div>
+  </section>
 
-<button id="verifyBtn" style="display:none;" onclick="show('verification')">
-Verify
-</button>
+  <!-- PAYOUT -->
+  <section id="payout" class="page hidden">
+    <div class="page-card">
+      <h2 class="page-title">Set Payout Method</h2>
+      <p class="page-sub">Where should we send your earnings?</p>
+      <div class="field">
+        <label class="field-label">Payment Method</label>
+        <select id="payoutMethod">
+          <option value="Skrill">Skrill</option>
+          <option value="USDT">USDT (TRC20)</option>
+          <option value="Grey">Grey</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label">Email / Wallet / Account Number</label>
+        <input id="payoutAddress" placeholder="Enter your payment address">
+      </div>
+      <button class="btn-primary full" onclick="savePayout()">Save &amp; Continue</button>
+    </div>
+  </section>
 
-<button id="payoutBtn" style="display:none;" onclick="show('payout')">
-Payout
-</button>
+  <!-- HOME -->
+  <section id="home" class="page hidden">
+    <div class="section-header">
+      <h2 class="section-title">Listings</h2>
+      <span class="listing-count" id="listingCount"></span>
+    </div>
+    <div id="listings" class="listings-grid"></div>
+    <div id="noListings" class="empty-state hidden">
+      <div class="empty-icon">&#9670;</div>
+      <p>No listings available right now</p>
+    </div>
+  </section>
 
-<button id="adminBtn" style="display:none;" onclick="show('admin')">
-Admin
-</button>
+  <!-- SELL -->
+  <section id="sell" class="page hidden">
+    <div class="page-card">
+      <h2 class="page-title">Create Listing</h2>
+      <div class="field">
+        <label class="field-label">Game Name</label>
+        <input id="game" placeholder="e.g. Valorant, FIFA 25, Genshin Impact">
+      </div>
+      <div class="field">
+        <label class="field-label">Account Details</label>
+        <textarea id="details" placeholder="Rank, level, skins, characters, coins..."></textarea>
+      </div>
+      <div class="field">
+        <label class="field-label">Price (USD)</label>
+        <input id="price" type="number" min="1" placeholder="e.g. 50">
+      </div>
+      <div class="field">
+        <label class="field-label">Screenshot <span class="field-hint">(optional)</span></label>
+        <input type="file" id="listingImg" accept="image/*" class="file-input">
+      </div>
+      <div id="sellMsg" class="status-msg hidden"></div>
+      <button class="btn-primary full" onclick="createListing()">Post Listing</button>
+    </div>
+  </section>
 
-<button onclick="logout()">Logout</button>
+  <!-- ORDERS -->
+  <section id="orders" class="page hidden">
+    <div class="section-header">
+      <h2 class="section-title">My Orders</h2>
+    </div>
+    <div id="ordersList"></div>
+    <div id="noOrders" class="empty-state hidden">
+      <div class="empty-icon">&#9670;</div>
+      <p>No orders yet</p>
+    </div>
+  </section>
 
-</nav>
+  <!-- ORDER DETAIL -->
+  <section id="order" class="page hidden">
+    <div id="orderBox"></div>
+  </section>
 
-<div class="container">
+  <!-- CHAT -->
+  <section id="chat" class="page hidden">
+    <div class="chat-wrap">
+      <div class="chat-header">
+        <button class="back-btn" onclick="show('orders')">&#8592; Back</button>
+        <span class="chat-title" id="chatTitle">Trade Chat</span>
+        <span class="chat-badge" id="chatStatus"></span>
+      </div>
+      <div id="messages" class="messages-box"></div>
+      <div class="chat-composer">
+        <input id="msgInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMessage()">
+        <label class="attach-btn" title="Attach image (sellers only)">
+          <span>&#128247;</span>
+          <input type="file" id="chatImages" accept="image/*" multiple>
+        </label>
+        <button class="send-btn" onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+  </section>
 
-<!-- AUTH -->
-<section id="auth">
-<h2>Login / Register</h2>
+  <!-- ADMIN -->
+  <section id="admin" class="page hidden">
+    <h2 class="section-title" style="margin-bottom:20px">Admin Panel</h2>
+    <div id="adminStats" class="admin-stats"></div>
+    <div class="admin-tabs">
+      <button class="atab active" onclick="adminTab(this,'aVerify')">Verifications</button>
+      <button class="atab" onclick="adminTab(this,'aOrders')">Orders</button>
+      <button class="atab" onclick="adminTab(this,'aListings')">Listings</button>
+      <button class="atab" onclick="adminTab(this,'aChats')">Chats</button>
+    </div>
+    <div id="aVerify" class="admin-panel"></div>
+    <div id="aOrders" class="admin-panel hidden"></div>
+    <div id="aListings" class="admin-panel hidden"></div>
+    <div id="aChats" class="admin-panel hidden"></div>
+  </section>
 
-<input id="email" placeholder="Email">
-<input id="password" type="password" placeholder="Password">
-
-<select id="role">
-<option value="buyer">Buyer</option>
-<option value="seller">Seller</option>
-</select>
-
-<button onclick="signup()">Sign Up</button>
-<button onclick="login()">Login</button>
-</section>
-
-<!-- SELLER VERIFICATION -->
-<section id="verification" class="card hidden">
-
-  <h2>Seller Verification</h2>
-
-  <!-- STEP 1 -->
-  <div style="margin-bottom:15px;">
-    <b>Step 1 — Pay $3 Verification Fee</b><br><br>
-
-    Pay using one of the methods below:<br><br>
-
-    <b>Skrill:</b> gamevaultmarket@gmail.com<br>
-    <b>USDT (TRC20):</b> 0x992d0E36A7409F0c9228B51C6bB8F875b1A4Af3B<br>
-    <b>Grey:</b> 212286724510<br><br>
-
-    ⚠️ After payment, upload proof below.
-  </div>
-
-  <hr>
-
-  <!-- STEP 2 -->
-  <div style="margin-top:15px;">
-    <b>Step 2 — Upload Documents</b><br><br>
-
-    ID Card / Passport:<br>
-    <input type="file" id="idPhoto" accept="image/*"><br><br>
-
-    Selfie holding ID:<br>
-    <input type="file" id="selfiePhoto" accept="image/*"><br><br>
-
-    Payment Proof Screenshot:<br>
-    <input type="file" id="paymentProof" accept="image/*"><br><br>
-  </div>
-
-  <!-- SUBMIT -->
-  <button onclick="submitVerification()" style="padding:10px 20px;">
-    Submit Verification
-  </button>
-
-</section>
-
-<!-- RISK & TERMS (FORCED) -->
-<section id="risk" class="hidden card">
-
-  <h2>Risk & Terms Agreement</h2>
-
-  <div style="max-height:300px;overflow:auto;margin-bottom:15px;">
-
-    <p><b>1. Platform Role</b><br>
-    GameVault Market only connects buyers and sellers. We do NOT own, sell, or guarantee any game accounts.</p>
-
-    <p><b>2. No Warranty</b><br>
-    We are not responsible for account bans, recoveries, scams, or losses outside the platform protection.</p>
-
-    <p><b>3. Payments</b><br>
-    All fees paid (verification & service fee) are NON-REFUNDABLE.</p>
-
-    <p><b>4. Forbidden Actions</b></p>
-    <ul>
-      <li>No scamming</li>
-      <li>No chargebacks</li>
-      <li>No sharing contacts (WhatsApp, Telegram, etc)</li>
-      <li>No bypassing GameVault system</li>
-    </ul>
-
-    <p><b>5. Ban Policy</b><br>
-    Violating rules = Permanent ban + account freeze.</p>
-
-    <p><b>6. Risk Notice</b><br>
-    Buying/selling game accounts always carries risk. You agree to trade at your own responsibility.</p>
-
-  </div>
-
-  <label style="display:block;margin-bottom:10px;">
-    <input type="checkbox" id="agreeTerms">
-    I have read and agree to the Risk & Terms
-  </label>
-
-  <button onclick="acceptTerms()">Continue</button>
-
-</section>
-<!-- PAYOUT -->
-<section id="payout" class="hidden card">
-<h2>Set Payout Method</h2>
-
-<select id="payoutMethod">
-<option>Skrill</option>
-<option>USDT</option>
-<option>Grey</option>
-</select>
-
-<input id="payoutAddress" placeholder="Email / Wallet / Account">
-
-<button onclick="savePayout()">Save</button>
-</section>
-
-<!-- HOME -->
-<section id="home" class="hidden">
-<h2>Listings</h2>
-<div id="listings"></div>
-</section>
-
-<!-- SELL -->
-<section id="sell" class="hidden card">
-<h2>Create Listing</h2>
-
-<input id="game" placeholder="Game name">
-<textarea id="details" placeholder="Account details"></textarea>
-<input id="price" placeholder="Price USD">
-
-<input type="file" id="listingImg" accept="image/*">
-
-<button onclick="createListing()">Post Listing</button>
-</section>
-
-<!-- ORDERS -->
-<section id="orders" class="hidden">
-<h2>My Orders</h2>
-<div id="ordersList"></div>
-</section>
-
-<!-- CHAT -->
-<section id="chat" class="hidden card">
-<h2>Chat</h2>
-
-<div id="messages"></div>
-
-<input id="msgInput" placeholder="Message">
-
-<!-- Seller can upload max 2 images, Buyer blocked by JS -->
-<input type="file" id="chatImages" accept="image/*" multiple>
-
-<button onclick="sendMessage()">Send</button>
-</section>
-
-<section id="order" class="hidden">
-  <h2>Order</h2>
-  <div id="orderBox"></div>
-</section>
-
-<!-- ADMIN -->
-<section id="admin" class="hidden">
-  
-<div id="adminStats"></div>
-<div id="adminEarnings"></div>
-
-<h2>Admin Panel</h2>
-
-<h3>Seller Verifications</h3>
-<div id="adminUsers"></div>
-
-<h3>Orders</h3>
-<div id="adminOrders"></div>
-
-<h3>Listings</h3>
-<div id="adminListings"></div>
-
-<h3>Chat Spy</h3>
-<div id="adminChats"></div>
-
-</section>
-
-</div>
-
-<footer>
-<p>GameVault Market ©</p>
-</footer>
+</main>
 
 <script src="script.js"></script>
 </body>
