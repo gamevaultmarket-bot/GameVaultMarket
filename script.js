@@ -85,6 +85,15 @@ auth.onAuthStateChanged(async user => {
 
   nav.classList.remove("hidden");
 
+  // FIX: Reset ALL buttons to hidden BEFORE the termsAccepted check
+  // Previously this reset happened AFTER the terms check, meaning
+  // if terms weren't accepted yet, the reset never ran and buttons
+  // could leak through on subsequent logins
+  sellBtn.style.display  = "none";
+  adminBtn.style.display = "none";
+  verifyBtn.style.display = "none";
+  payoutBtn.style.display = "none";
+
   const snap = await db.collection("users").doc(user.uid).get();
   if (!snap.exists) return;
 
@@ -92,14 +101,10 @@ auth.onAuthStateChanged(async user => {
 
   if (!data.termsAccepted) {
     show("risk");
-    return;
+    return;  // buttons stay hidden — correct
   }
 
-  sellBtn.style.display = "none";
-  adminBtn.style.display = "none";
-  verifyBtn.style.display = "none";
-  payoutBtn.style.display = "none";
-
+  // Only admin gets the admin button
   if (user.email === "gamevaultmarket@gmail.com") {
     adminBtn.style.display = "inline-block";
     show("admin");
@@ -107,22 +112,26 @@ auth.onAuthStateChanged(async user => {
     return;
   }
 
+  // Seller not verified yet
   if (data.role === "seller" && !data.verified) {
     verifyBtn.style.display = "inline-block";
     show("verification");
     return;
   }
 
+  // Seller verified but no payout set
   if (data.role === "seller" && data.verified && !data.payout) {
     payoutBtn.style.display = "inline-block";
     show("payout");
     return;
   }
 
+  // Seller fully set up — show Sell button only, never Admin
   if (data.role === "seller" && data.verified) {
     sellBtn.style.display = "inline-block";
   }
 
+  // Buyers and verified sellers land here — adminBtn stays hidden
   show("home");
   loadListings();
 });
