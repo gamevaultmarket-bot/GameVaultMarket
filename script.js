@@ -310,7 +310,6 @@ async function savePayout() {
 ═══════════════════════════════════════ */
 function loadListings() {
   db.collection('listings').where('status', '==', 'active')
-    .orderBy('created', 'desc')
     .onSnapshot(snap => {
       const grid     = document.getElementById('listings');
       const noList   = document.getElementById('noListings');
@@ -517,7 +516,6 @@ function loadOrders() {
 
   db.collection('orders')
     .where('buyer', '==', currentUser.uid)
-    .orderBy('created', 'desc')
     .onSnapshot(snap => {
       const list    = document.getElementById('ordersList');
       const noOrders = document.getElementById('noOrders');
