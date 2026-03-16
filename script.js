@@ -248,8 +248,21 @@ auth.onAuthStateChanged(async user => {
     if (b) b.style.display = 'none';
   });
 
-  const snap = await db.collection('users').doc(user.uid).get();
-  if (!snap.exists) return;
+  // FIX: Race condition — onAuthStateChanged fires immediately after
+  // createUserWithEmailAndPassword, before the Firestore user doc is written.
+  // Retry up to 5 times with 800ms delay to wait for the doc to appear.
+  let snap = null;
+  for (let i = 0; i < 5; i++) {
+    snap = await db.collection('users').doc(user.uid).get();
+    if (snap.exists) break;
+    await new Promise(res => setTimeout(res, 800));
+  }
+  if (!snap || !snap.exists) {
+    // Doc never appeared — show a helpful error instead of silent failure
+    show('auth');
+    alert('Account setup failed. Please try logging in again.');
+    return;
+  }
   const data = snap.data();
 
   /* Must accept terms first */
