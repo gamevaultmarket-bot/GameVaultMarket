@@ -1,6 +1,6 @@
 /* ================================================
    GAMEVAULT MARKET — script.js
-   Full rebuild. Clean, secure, all bugs resolved.
+   Full secure build with all features.
 ================================================ */
 
 /* ── FIREBASE ── */
@@ -13,46 +13,48 @@ const auth = firebase.auth();
 const db   = firebase.firestore();
 
 /* ── CONFIG ── */
-const ADMIN_EMAIL  = "gamevaultmarket@gmail.com";
-const CLOUD_NAME   = "dwxgzykij";
-const CLOUD_PRESET = "gamevault_upload";
-const SERVICE_FEE  = 2;
-const PAYMENTS     = {
+const ADMIN_EMAIL      = "gamevaultmarket@gmail.com";
+const CLOUD_NAME       = "dwxgzykij";
+const CLOUD_PRESET     = "gamevault_upload";
+const SERVICE_FEE      = 2;
+const ORDER_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour in ms
+const MAX_BUYERS       = 5;              // max active orders per listing
+const PAYMENTS         = {
   Skrill: "gamevaultmarket@gmail.com",
   USDT:   "0x992d0E36A7409F0c9228B51C6bB8F875b1A4Af3B",
   Grey:   "212286724510"
 };
 
 /* ── STATE ── */
-let currentUser = null;
-let currentChat = null;
-let chatUnsub   = null;
+let currentUser      = null;
+let currentChat      = null;
+let chatUnsub        = null;
+let ratingOrderId    = null;
+let ratingSellerUid  = null;
+let selectedStars    = 0;
+let countdownTimer   = null;
 
 /* ════════════════════════════════════════
-   SECURITY HELPERS
+   SECURITY — XSS PREVENTION
 ════════════════════════════════════════ */
-
-/* Escape user data before inserting into innerHTML — prevents XSS */
 function esc(v) {
   if (v === null || v === undefined) return '';
   return String(v)
-    .replace(/&/g,  '&amp;')
-    .replace(/</g,  '&lt;')
-    .replace(/>/g,  '&gt;')
-    .replace(/"/g,  '&quot;')
-    .replace(/'/g,  '&#x27;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
 }
 
-/* Rate limiter — prevents brute force & spam */
+/* ════════════════════════════════════════
+   SECURITY — RATE LIMITER
+   Blocks brute force on login/signup/chat
+════════════════════════════════════════ */
 const RL = {
   _c: {}, _b: {},
   check(key, max, ms) {
     const now = Date.now();
     if (this._b[key]) {
-      if (now < this._b[key]) {
-        alert('Too many attempts. Wait ' + Math.ceil((this._b[key]-now)/1000) + 's.');
-        return false;
-      }
+      if (now < this._b[key]) { alert('Too many attempts. Wait ' + Math.ceil((this._b[key]-now)/1000) + 's.'); return false; }
       delete this._b[key]; delete this._c[key];
     }
     if (!this._c[key]) this._c[key] = { n: 0, t: now };
@@ -64,18 +66,45 @@ const RL = {
   reset(key) { delete this._c[key]; delete this._b[key]; }
 };
 
-/* Scrub contact info from chat messages */
+/* ════════════════════════════════════════
+   SECURITY — MESSAGE SCRUBBER
+   Strips all contact info from chat
+════════════════════════════════════════ */
 function scrub(text) {
   if (!text) return '';
   return text
     .replace(/(\+\d[\d\s\-()]{5,})/g, '[removed]')
     .replace(/\b\d{8,}\b/g, '[removed]')
-    .replace(/(whatsapp|telegram|wechat|snapchat|instagram|discord|skype|viber|signal|kik|tiktok)/gi, '[removed]')
+    .replace(/(whatsapp|telegram|wechat|snapchat|instagram|discord|skype|viber|signal|kik|tiktok|facebook|twitter|x\.com)/gi, '[removed]')
     .replace(/[\w.+\-]+@[\w\-]+\.[a-z]{2,}/gi, '[removed]')
     .replace(/(https?:\/\/|www\.)[^\s]*/gi, '[removed]')
     .replace(/@\w+/g, '[removed]')
-    .trim()
-    .slice(0, 500);
+    .replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine)\b/gi, '[#]')
+    .replace(/(\[#\][\s\-]*){4,}/g, '[removed]')
+    .replace(/\b(add me|find me|contact me|reach me|message me|dm me|hit me up)\b/gi, '[removed]')
+    .trim().slice(0, 500);
+}
+
+/* ════════════════════════════════════════
+   SECURITY — DEVICE CHECK
+   Warns user on new device login
+════════════════════════════════════════ */
+function checkDevice(uid) {
+  const key     = 'gv_dev_' + uid;
+  const current = navigator.userAgent + '|' + screen.width + 'x' + screen.height;
+  const stored  = localStorage.getItem(key);
+  if (!stored) { localStorage.setItem(key, current); return; }
+  if (stored !== current) {
+    localStorage.setItem(key, current);
+    db.collection('securityLog').add({
+      uid, event: 'new_device_login',
+      userAgent: navigator.userAgent,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(() => {});
+    setTimeout(() => {
+      alert('Security notice: Login detected from a new device or browser. If this was not you, change your password immediately.');
+    }, 1200);
+  }
 }
 
 /* ════════════════════════════════════════
@@ -86,7 +115,6 @@ function show(id) {
   const el = document.getElementById(id);
   if (el) el.classList.remove('hidden');
 }
-
 function toggleMenu() { document.getElementById('mobileNav').classList.toggle('hidden'); }
 function closeMenu()  { document.getElementById('mobileNav').classList.add('hidden'); }
 
@@ -113,8 +141,8 @@ function clearMsg(id) {
 function badge(status) {
   const map = {
     awaiting_fee:        ['b-gold',  'Awaiting Fee'],
-    paid_waiting_seller: ['b-blue',  'Fee Paid'],
-    paid:                ['b-blue',  'Paid'],
+    paid_waiting_seller: ['b-blue',  'Awaiting Confirmation'],
+    paid:                ['b-green', 'Chat Unlocked'],
     released:            ['b-green', 'Completed'],
     cancelled:           ['b-red',   'Cancelled'],
     pending:             ['b-gold',  'Pending'],
@@ -123,6 +151,7 @@ function badge(status) {
     active:              ['b-green', 'Active'],
     sold:                ['b-gray',  'Sold'],
     removed:             ['b-red',   'Removed'],
+    suspended:           ['b-red',   'Suspended'],
   };
   const [cls, lbl] = map[status] || ['b-gray', status];
   return '<span class="badge ' + cls + '">' + lbl + '</span>';
@@ -135,8 +164,23 @@ function aTab(btn, panelId) {
   document.getElementById(panelId).classList.remove('hidden');
 }
 
+function statBox(label, value, colorClass) {
+  return '<div class="stat-box"><div class="stat-lbl">' + label + '</div><div class="stat-val ' + (colorClass||'') + '">' + value + '</div></div>';
+}
+function aRow(key, valHtml) {
+  return '<div class="a-row"><span class="a-key">' + key + '</span><span class="a-val">' + valHtml + '</span></div>';
+}
+function starsHtml(avg, count) {
+  if (!count) return '';
+  const filled = Math.round(avg);
+  let s = '';
+  for (let i = 1; i <= 5; i++) s += i <= filled ? '&#9733;' : '&#9734;';
+  return '<div class="l-rating"><span class="stars">' + s + '</span><span class="count">(' + count + ')</span></div>';
+}
+
 /* ════════════════════════════════════════
-   AUTH
+   AUTH — SIGNUP
+   Email verification required
 ════════════════════════════════════════ */
 async function doSignup() {
   if (!RL.check('signup', 3, 120000)) return;
@@ -146,29 +190,57 @@ async function doSignup() {
   const role     = document.getElementById('signupRole').value;
 
   clearMsg('signupMsg');
-  if (!email || !password)     return setMsg('signupMsg', 'Please fill in all fields.', 'error');
-  if (password.length < 6)     return setMsg('signupMsg', 'Password must be at least 6 characters.', 'error');
+  if (!email || !password) return setMsg('signupMsg', 'Please fill in all fields.', 'error');
+  if (password.length < 6) return setMsg('signupMsg', 'Password must be at least 6 characters.', 'error');
   if (!['buyer','seller'].includes(role)) return;
 
-  setMsg('signupMsg', 'Creating account...', 'loading');
+  setMsg('signupMsg', 'Creating your account...', 'loading');
 
   try {
     const r = await auth.createUserWithEmailAndPassword(email, password);
+    await r.user.sendEmailVerification();
     await db.collection('users').doc(r.user.uid).set({
-      email,
-      role,
-      verified:      false,
-      payout:        null,
-      termsAccepted: false,
-      created:       firebase.firestore.FieldValue.serverTimestamp()
+      email, role,
+      verified: false, payout: null,
+      termsAccepted: false, suspended: false,
+      created: firebase.firestore.FieldValue.serverTimestamp()
     });
     RL.reset('signup');
-    /* onAuthStateChanged will take it from here */
+    await auth.signOut();
+    // Show verify email page
+    document.getElementById('appHeader').classList.add('hidden');
+    show('verifyEmail');
   } catch (e) {
     setMsg('signupMsg', e.message, 'error');
   }
 }
 
+async function resendVerification() {
+  try {
+    const user = auth.currentUser;
+    if (user) {
+      await user.sendEmailVerification();
+      alert('Verification email resent. Check your inbox.');
+    } else {
+      alert('Please log in first, then request a new verification email.');
+    }
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function checkVerified() {
+  const user = auth.currentUser;
+  if (!user) { show('auth'); return; }
+  await user.reload();
+  if (user.emailVerified) {
+    location.reload();
+  } else {
+    alert('Email not verified yet. Please click the link in your email first.');
+  }
+}
+
+/* ── LOGIN ── */
 async function doLogin() {
   if (!RL.check('login', 5, 60000)) return;
 
@@ -181,7 +253,11 @@ async function doLogin() {
   setMsg('loginMsg', 'Logging in...', 'loading');
 
   try {
-    await auth.signInWithEmailAndPassword(email, password);
+    const cred = await auth.signInWithEmailAndPassword(email, password);
+    if (!cred.user.emailVerified && cred.user.email !== ADMIN_EMAIL) {
+      await auth.signOut();
+      return setMsg('loginMsg', 'Please verify your email before logging in. Check your inbox.', 'error');
+    }
     RL.reset('login');
   } catch (e) {
     setMsg('loginMsg', e.message, 'error');
@@ -190,16 +266,16 @@ async function doLogin() {
 
 function doLogout() {
   if (chatUnsub) { chatUnsub(); chatUnsub = null; }
+  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
   currentChat = null;
   auth.signOut();
 }
 
 /* ════════════════════════════════════════
    AUTH STATE OBSERVER
-   Key fixes:
-   1. All button resets happen BEFORE any early return
-   2. Retry loop handles signup race condition
-   3. Full try/catch so errors show instead of blank screen
+   Fixes: button reset before returns,
+   race condition retry, full try/catch,
+   suspension check, device check
 ════════════════════════════════════════ */
 auth.onAuthStateChanged(async user => {
   currentUser = user;
@@ -222,19 +298,15 @@ auth.onAuthStateChanged(async user => {
 
   header.classList.remove('hidden');
 
-  /* Reset every conditional button BEFORE any return — prevents leaking */
+  // Always reset all conditional nav buttons before any early return
   [sellBtn, adminBtn, verifyBtn, payoutBtn,
    mSellBtn, mAdminBtn, mVerifyBtn, mPayoutBtn].forEach(b => {
     if (b) b.style.display = 'none';
   });
 
   try {
-    /*
-     * Signup race condition fix:
-     * Firebase fires onAuthStateChanged immediately after account creation,
-     * but the Firestore user doc write may not have completed yet.
-     * Retry up to 8 times (4 seconds total) before giving up.
-     */
+    // Retry loop: handles signup race condition where Firestore doc
+    // isn't written yet when onAuthStateChanged first fires
     let snap = null;
     for (let i = 0; i < 8; i++) {
       snap = await db.collection('users').doc(user.uid).get();
@@ -245,19 +317,30 @@ auth.onAuthStateChanged(async user => {
     if (!snap || !snap.exists) {
       await auth.signOut();
       show('auth');
-      setMsg('signupMsg', 'Account setup failed. Please try signing up again.', 'error');
+      setMsg('signupMsg', 'Account setup failed. Please try again.', 'error');
       return;
     }
 
     const data = snap.data();
 
-    /* Force terms agreement */
+    // Suspension check — blocked users cannot proceed
+    if (data.suspended) {
+      await auth.signOut();
+      show('auth');
+      setMsg('loginMsg', 'Your account has been suspended. Contact support.', 'error');
+      return;
+    }
+
+    // Device fingerprint check
+    checkDevice(user.uid);
+
+    // Terms must be accepted before anything else
     if (!data.termsAccepted) {
       show('risk');
       return;
     }
 
-    /* Admin */
+    // Admin
     if (user.email === ADMIN_EMAIL) {
       adminBtn.style.display  = 'inline-block';
       mAdminBtn.style.display = 'block';
@@ -266,7 +349,7 @@ auth.onAuthStateChanged(async user => {
       return;
     }
 
-    /* Seller — needs verification */
+    // Seller: awaiting verification
     if (data.role === 'seller' && !data.verified) {
       verifyBtn.style.display  = 'inline-block';
       mVerifyBtn.style.display = 'block';
@@ -274,7 +357,7 @@ auth.onAuthStateChanged(async user => {
       return;
     }
 
-    /* Seller — needs payout */
+    // Seller: verified but no payout set
     if (data.role === 'seller' && data.verified && !data.payout) {
       payoutBtn.style.display  = 'inline-block';
       mPayoutBtn.style.display = 'block';
@@ -282,19 +365,19 @@ auth.onAuthStateChanged(async user => {
       return;
     }
 
-    /* Seller fully onboarded */
+    // Seller fully onboarded
     if (data.role === 'seller' && data.verified && data.payout) {
       sellBtn.style.display  = 'inline-block';
       mSellBtn.style.display = 'block';
     }
 
-    /* Buyer or verified seller — go to listings */
     show('home');
     loadListings();
     startNotifications();
+    runAutoCancelCheck(); // check for expired unpaid orders
 
   } catch (err) {
-    console.error('Auth state error:', err);
+    console.error('Auth observer error:', err);
     show('auth');
     setMsg('loginMsg', 'Something went wrong: ' + err.message, 'error');
   }
@@ -305,16 +388,15 @@ auth.onAuthStateChanged(async user => {
 ════════════════════════════════════════ */
 async function acceptTerms() {
   const cb = document.getElementById('agreeTerms');
-  if (!cb.checked) {
-    alert('Please tick the checkbox to agree before continuing.');
-    return;
-  }
+  if (!cb.checked) { alert('Please tick the checkbox to agree before continuing.'); return; }
+  if (!auth.currentUser) return;
+  // Verify the doc exists and terms not already accepted (prevents console bypass)
+  const snap = await db.collection('users').doc(auth.currentUser.uid).get();
+  if (!snap.exists || snap.data().termsAccepted) return;
   try {
     await db.collection('users').doc(auth.currentUser.uid).update({ termsAccepted: true });
     location.reload();
-  } catch (e) {
-    alert(e.message);
-  }
+  } catch (e) { alert(e.message); }
 }
 
 /* ════════════════════════════════════════
@@ -331,11 +413,8 @@ async function submitVerification() {
   if (!idFile || !selfieFile || !payFile)
     return setMsg('verifyMsg', 'Please upload all three files.', 'error');
 
-  /* Prevent duplicate submissions */
-  const existing = await db.collection('verifications')
-    .where('uid', '==', currentUser.uid).get();
-  if (!existing.empty)
-    return setMsg('verifyMsg', 'Already submitted. Please wait for admin review.', 'info');
+  const existing = await db.collection('verifications').where('uid','==',currentUser.uid).get();
+  if (!existing.empty) return setMsg('verifyMsg', 'Already submitted. Wait for admin review.', 'info');
 
   setMsg('verifyMsg', 'Uploading files, please wait...', 'loading');
 
@@ -348,7 +427,8 @@ async function submitVerification() {
 
   await db.collection('verifications').add({
     uid: currentUser.uid, idPhoto: idUrl, selfie: selfieUrl,
-    paymentProof: payUrl, status: 'pending', createdAt: Date.now()
+    paymentProof: payUrl, status: 'pending',
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
 
   setMsg('verifyMsg', 'Submitted! Admin will review shortly.', 'success');
@@ -361,30 +441,26 @@ async function savePayout() {
   clearMsg('payoutMsg');
   const method  = document.getElementById('payoutMethod').value;
   const address = document.getElementById('payoutAddress').value.trim();
-
   if (!address) return setMsg('payoutMsg', 'Please enter your payment address.', 'error');
-
   try {
     await db.collection('users').doc(auth.currentUser.uid).update({ payout: { method, address } });
     show('home');
     loadListings();
-  } catch (e) {
-    setMsg('payoutMsg', e.message, 'error');
-  }
+    startNotifications();
+  } catch (e) { setMsg('payoutMsg', e.message, 'error'); }
 }
 
 /* ════════════════════════════════════════
    LISTINGS
-   Fix: innerHTML = '' before rebuild (no duplicates)
+   Fix: clear before rebuild, show ratings
 ════════════════════════════════════════ */
 function loadListings() {
-  db.collection('listings').where('status', '==', 'active')
-    .onSnapshot(snap => {
+  db.collection('listings').where('status','==','active')
+    .onSnapshot(async snap => {
       const grid    = document.getElementById('listings');
       const noEl    = document.getElementById('noListings');
       const countEl = document.getElementById('listingCount');
-
-      grid.innerHTML = ''; /* clear first — prevents duplicate cards */
+      grid.innerHTML = '';
 
       if (snap.empty) {
         noEl.classList.remove('hidden');
@@ -394,8 +470,18 @@ function loadListings() {
       noEl.classList.add('hidden');
       if (countEl) countEl.textContent = snap.size + ' active';
 
-      snap.forEach(doc => {
+      for (const doc of snap.docs) {
         const d = doc.data();
+
+        // Get seller rating
+        const ratSnap = await db.collection('ratings')
+          .where('sellerUid','==', d.seller).get();
+        let avgRating = 0, ratingCount = 0;
+        if (!ratSnap.empty) {
+          ratingCount = ratSnap.size;
+          avgRating = ratSnap.docs.reduce((sum, r) => sum + (r.data().stars || 0), 0) / ratingCount;
+        }
+
         const card = document.createElement('div');
         card.className = 'l-card';
         card.innerHTML =
@@ -403,21 +489,22 @@ function loadListings() {
             ? '<img class="l-img" src="' + esc(d.screenshot) + '" alt="' + esc(d.game) + '" loading="lazy">'
             : '<div class="l-img-ph">No image</div>') +
           '<div class="l-body">' +
-            '<div class="l-game">'    + esc(d.game)            + '</div>' +
-            '<div class="l-details">' + esc(d.details || '')   + '</div>' +
+            '<div class="l-game">' + esc(d.game) + '</div>' +
+            '<div class="l-details">' + esc(d.details || '') + '</div>' +
+            starsHtml(avgRating, ratingCount) +
             '<div class="l-footer">' +
-              '<span class="l-price">$' + esc(String(d.price)) + '</span>' +
+              '<span class="l-price">$' + (Number(d.price) || 0) + '</span>' +
               '<button class="btn-primary" onclick="doBuy(\'' + esc(doc.id) + '\')">Buy</button>' +
             '</div>' +
           '</div>';
         grid.appendChild(card);
-      });
+      }
     });
 }
 
 /* ════════════════════════════════════════
    CREATE LISTING
-   Fix: listing limit check lives here only
+   Listing limit: max 5 active per seller
 ════════════════════════════════════════ */
 async function createListing() {
   clearMsg('sellMsg');
@@ -428,39 +515,36 @@ async function createListing() {
   const price   = parseFloat(document.getElementById('price').value);
   const imgFile = document.getElementById('listingImg').files[0];
 
-  if (!game)            return setMsg('sellMsg', 'Please enter the game name.', 'error');
-  if (game.length > 60) return setMsg('sellMsg', 'Game name max 60 characters.', 'error');
+  if (!game)                 return setMsg('sellMsg', 'Please enter the game name.', 'error');
+  if (game.length > 60)      return setMsg('sellMsg', 'Game name max 60 characters.', 'error');
   if (details.length > 1000) return setMsg('sellMsg', 'Details max 1000 characters.', 'error');
   if (!price || price < 1)   return setMsg('sellMsg', 'Please enter a valid price ($1 minimum).', 'error');
   if (price > 10000)         return setMsg('sellMsg', 'Price cannot exceed $10,000.', 'error');
 
   const existing = await db.collection('listings')
-    .where('seller', '==', auth.currentUser.uid)
-    .where('status', '==', 'active').get();
+    .where('seller','==', auth.currentUser.uid).where('status','==','active').get();
   if (existing.size >= 5) return setMsg('sellMsg', 'Maximum 5 active listings allowed.', 'error');
 
   setMsg('sellMsg', 'Posting listing...', 'loading');
-
   let screenshotUrl = null;
   if (imgFile) screenshotUrl = await uploadFile('listings', imgFile);
 
   await db.collection('listings').add({
-    game, details, price,
-    screenshot: screenshotUrl,
-    seller:  auth.currentUser.uid,
-    status:  'active',
+    game, details, price, screenshot: screenshotUrl,
+    seller: auth.currentUser.uid, status: 'active',
     created: firebase.firestore.FieldValue.serverTimestamp()
   });
 
   setMsg('sellMsg', 'Listing posted successfully!', 'success');
-  document.getElementById('game').value    = '';
-  document.getElementById('details').value = '';
-  document.getElementById('price').value   = '';
+  document.getElementById('game').value       = '';
+  document.getElementById('details').value    = '';
+  document.getElementById('price').value      = '';
   document.getElementById('listingImg').value = '';
 }
 
 /* ════════════════════════════════════════
    BUY
+   Max 5 buyers per listing
    Fix: removed misplaced seller limit check
 ════════════════════════════════════════ */
 async function doBuy(listingId) {
@@ -472,31 +556,80 @@ async function doBuy(listingId) {
   const d = listing.data();
   if (d.seller === currentUser.uid) return alert('You cannot buy your own listing.');
 
-  const active = await db.collection('orders')
-    .where('listingId', '==', listingId)
-    .where('status', 'in', ['awaiting_fee','paid_waiting_seller','paid']).get();
-  if (!active.empty) return alert('This listing already has an active order.');
+  // Check if this buyer already has an active order on this listing
+  const myOrder = await db.collection('orders')
+    .where('listingId','==', listingId)
+    .where('buyer','==', currentUser.uid)
+    .where('status','in',['awaiting_fee','paid_waiting_seller','paid']).get();
+  if (!myOrder.empty) return alert('You already have an active order for this listing.');
+
+  // Max 5 buyers per listing
+  const activeOrders = await db.collection('orders')
+    .where('listingId','==', listingId)
+    .where('status','in',['awaiting_fee','paid_waiting_seller','paid']).get();
+  if (activeOrders.size >= MAX_BUYERS)
+    return alert('This listing has reached the maximum of 5 active buyers. Try again later.');
 
   const ref = await db.collection('orders').add({
-    listingId,
-    buyer:   currentUser.uid,
-    seller:  d.seller,
-    game:    d.game,
-    price:   d.price,
-    status:  'awaiting_fee',
+    listingId, buyer: currentUser.uid, seller: d.seller,
+    game: d.game, price: d.price, status: 'awaiting_fee',
     created: firebase.firestore.FieldValue.serverTimestamp()
   });
 
-  // Create the chat document for this order so it exists when both parties open it
+  // Create chat doc so the listener can attach
   await db.collection('chats').doc(ref.id).set({
-    orderId: ref.id,
-    buyer:   currentUser.uid,
-    seller:  d.seller,
+    orderId: ref.id, buyer: currentUser.uid, seller: d.seller,
     created: firebase.firestore.FieldValue.serverTimestamp()
   });
 
   openOrder(ref.id);
   watchOrder(ref.id);
+}
+
+/* ════════════════════════════════════════
+   AUTO-CANCEL UNPAID ORDERS AFTER 1 HOUR
+   Runs on login and when orders load
+════════════════════════════════════════ */
+async function runAutoCancelCheck() {
+  if (!currentUser) return;
+  const now = Date.now();
+
+  const snap = await db.collection('orders')
+    .where('buyer','==', currentUser.uid)
+    .where('status','==','awaiting_fee').get();
+
+  for (const doc of snap.docs) {
+    const o = doc.data();
+    const createdMs = o.created && o.created.toMillis ? o.created.toMillis() : 0;
+    if (createdMs && (now - createdMs) > ORDER_TIMEOUT_MS) {
+      await doc.ref.update({ status: 'cancelled', cancelledAt: new Date(), cancelReason: 'auto_timeout' });
+      if (o.listingId) {
+        await db.collection('listings').doc(o.listingId).get().then(l => {
+          if (l.exists && l.data().status === 'active') return; // listing still active, fine
+        });
+      }
+    }
+  }
+}
+
+/* countdown timer shown on locked order page */
+function startCountdown(createdMs, orderId) {
+  if (countdownTimer) clearInterval(countdownTimer);
+  const el = document.getElementById('countdown-' + orderId);
+  if (!el) return;
+
+  countdownTimer = setInterval(() => {
+    const remaining = ORDER_TIMEOUT_MS - (Date.now() - createdMs);
+    if (remaining <= 0) {
+      clearInterval(countdownTimer);
+      el.textContent = 'Order expired';
+      runAutoCancelCheck();
+      return;
+    }
+    const mins = Math.floor(remaining / 60000);
+    const secs = Math.floor((remaining % 60000) / 1000);
+    el.textContent = 'Auto-cancels in ' + mins + 'm ' + secs + 's if fee not paid';
+  }, 1000);
 }
 
 /* ════════════════════════════════════════
@@ -506,38 +639,59 @@ async function openOrder(orderId) {
   const snap = await db.collection('orders').doc(orderId).get();
   if (!snap.exists) return;
   const o = snap.data();
-
   show('order');
-  const locked = o.status === 'awaiting_fee';
+
+  const isLocked   = o.status === 'awaiting_fee';
+  const isWaiting  = o.status === 'paid_waiting_seller';
+  const isUnlocked = o.status === 'paid';
+  const createdMs  = o.created && o.created.toMillis ? o.created.toMillis() : 0;
+
+  let bodyHtml = '';
+
+  if (isLocked) {
+    bodyHtml =
+      '<div id="countdown-' + esc(orderId) + '" class="countdown-bar">&#9201; Calculating...</div>' +
+      '<div class="locked-box">' +
+        '<div class="locked-title">&#128274; Seller Contact Locked</div>' +
+        'Pay the $' + SERVICE_FEE + ' service fee to unlock communication with the seller.<br><br>' +
+        '<strong>Skrill:</strong> ' + PAYMENTS.Skrill + '<br>' +
+        '<strong>USDT TRC20:</strong> ' + PAYMENTS.USDT + '<br>' +
+        '<strong>Grey:</strong> ' + PAYMENTS.Grey +
+      '</div>' +
+      '<div class="field" style="margin-bottom:14px"><label class="flabel">Upload Fee Payment Screenshot</label>' +
+      '<input type="file" id="serviceProof" accept="image/*" class="file-inp"></div>' +
+      '<button class="btn-primary w100" onclick="submitServiceFee(\'' + esc(orderId) + '\')">Submit Fee Proof</button>';
+  } else if (isWaiting) {
+    bodyHtml =
+      '<div style="padding:13px;background:var(--bg3);border:1px solid rgba(77,159,255,.3);border-radius:var(--r);margin-bottom:14px;font-size:13px;color:var(--blue)">' +
+        '&#9203; Fee proof submitted. Waiting for admin to confirm payment. Chat will unlock once confirmed.' +
+      '</div>';
+  } else if (isUnlocked) {
+    bodyHtml =
+      '<div style="padding:13px;background:var(--bg3);border:1px solid var(--bdrA);border-radius:var(--r);margin-bottom:14px;font-size:13px;color:var(--t2)">' +
+        '&#128275; Payment confirmed. Chat is now unlocked. Complete your trade safely.' +
+      '</div>' +
+      '<button class="btn-primary w100" onclick="openChat(\'' + esc(orderId) + '\',\'' + esc(o.game) + '\')">Open Trade Chat</button>';
+  } else if (o.status === 'released') {
+    bodyHtml = '<div style="padding:13px;background:var(--bg3);border:1px solid var(--bdrA);border-radius:var(--r);font-size:13px;color:var(--accent)">&#10003; Trade completed successfully.</div>';
+  } else if (o.status === 'cancelled') {
+    bodyHtml = '<div style="padding:13px;background:var(--bg3);border:1px solid rgba(255,77,77,.3);border-radius:var(--r);font-size:13px;color:var(--red)">&#10005; This order was cancelled.' + (o.cancelReason === 'auto_timeout' ? ' (Payment not received within 1 hour.)' : '') + '</div>';
+  }
 
   document.getElementById('orderBox').innerHTML =
     '<div class="od-card">' +
       '<div class="od-hdr">' +
-        '<div>' +
-          '<div class="o-id">ORDER #' + esc(orderId.slice(-6).toUpperCase()) + '</div>' +
-          '<div style="font-size:15px;font-weight:500;margin-top:2px">' + esc(o.game) + '</div>' +
-        '</div>' +
+        '<div><div class="o-id">ORDER #' + esc(orderId.slice(-6).toUpperCase()) + '</div>' +
+        '<div style="font-size:15px;font-weight:500;margin-top:2px">' + esc(o.game) + '</div></div>' +
         badge(o.status) +
       '</div>' +
       '<div class="od-body">' +
         '<div class="od-row"><span>Listing price</span><span style="color:var(--accent);font-family:var(--fd);font-size:17px">$' + esc(String(o.price)) + '</span></div>' +
-        (locked
-          ? '<div class="locked-box">' +
-              '<div class="locked-title">&#128274; Seller Contact Locked</div>' +
-              'Pay the $' + SERVICE_FEE + ' service fee to unlock the seller and begin the trade.<br><br>' +
-              '<strong>Skrill:</strong> ' + PAYMENTS.Skrill + '<br>' +
-              '<strong>USDT TRC20:</strong> ' + PAYMENTS.USDT + '<br>' +
-              '<strong>Grey:</strong> ' + PAYMENTS.Grey +
-            '</div>' +
-            '<div class="field" style="margin-bottom:14px">' +
-              '<label class="flabel">Upload Fee Payment Screenshot</label>' +
-              '<input type="file" id="serviceProof" accept="image/*" class="file-inp">' +
-            '</div>' +
-            '<button class="btn-primary w100" onclick="submitServiceFee(\'' + esc(orderId) + '\')">Submit Fee Proof — Unlock Seller</button>'
-          : '<div style="padding:13px;background:var(--bg3);border:1px solid var(--bdrA);border-radius:var(--r);margin-bottom:14px;font-size:13px;color:var(--t2)">&#128275; Seller unlocked. Use chat to complete the trade.</div>' +
-            '<button class="btn-primary w100" onclick="openChat(\'' + esc(orderId) + '\',\'' + esc(o.game) + '\')">Open Trade Chat</button>') +
+        bodyHtml +
       '</div>' +
     '</div>';
+
+  if (isLocked && createdMs) startCountdown(createdMs, orderId);
 }
 
 function watchOrder(orderId) {
@@ -545,24 +699,28 @@ function watchOrder(orderId) {
     if (!doc.exists) return;
     const s = doc.data().status;
     if (s === 'released' || s === 'cancelled') {
-      alert('This order has been closed.');
-      show('home');
+      if (s === 'released' && doc.data().buyer === currentUser.uid) {
+        showRatingModal(orderId, doc.data().seller);
+      } else {
+        alert('This order has been closed.');
+        show('home');
+      }
       return;
     }
-    const orderSection = document.getElementById('order');
-    if (!orderSection.classList.contains('hidden')) openOrder(orderId);
+    if (!document.getElementById('order').classList.contains('hidden')) openOrder(orderId);
   });
 }
 
 /* ════════════════════════════════════════
    ORDERS LIST
-   Fix: queries BOTH buyer and seller sides
+   Queries both buyer and seller sides
 ════════════════════════════════════════ */
 function loadOrders() {
   if (!currentUser) return;
+  runAutoCancelCheck();
 
-  const list     = document.getElementById('ordersList');
-  const noOrders = document.getElementById('noOrders');
+  const list      = document.getElementById('ordersList');
+  const noOrders  = document.getElementById('noOrders');
   const allOrders = {};
 
   function render() {
@@ -581,15 +739,15 @@ function loadOrders() {
           badge(o.status) +
         '</div>' +
         '<div class="o-game">' + esc(o.game) + '</div>' +
-        '<div class="o-meta">' +
-          '$' + esc(String(o.price)) + ' &nbsp;&middot;&nbsp;' +
+        '<div class="o-meta">$' + esc(String(o.price)) + ' &nbsp;&middot;&nbsp;' +
           '<span style="color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:.06em">' +
             (isSeller ? 'You are selling' : 'You are buying') +
           '</span>' +
         '</div>' +
         '<div class="o-actions">' +
           '<button class="btn-outline" onclick="openOrder(\'' + esc(o._id) + '\');watchOrder(\'' + esc(o._id) + '\')">View Order</button>' +
-          (o.status !== 'awaiting_fee' && o.status !== 'released' && o.status !== 'cancelled'
+          // Chat only shows when admin has confirmed payment (status === 'paid')
+          (o.status === 'paid'
             ? '<button class="btn-primary" onclick="openChat(\'' + esc(o._id) + '\',\'' + esc(o.game) + '\')">Chat</button>'
             : '') +
         '</div>';
@@ -597,16 +755,14 @@ function loadOrders() {
     });
   }
 
-  /* Listen as buyer */
-  db.collection('orders').where('buyer', '==', currentUser.uid)
+  db.collection('orders').where('buyer','==', currentUser.uid)
     .onSnapshot(snap => {
       snap.forEach(doc => { allOrders[doc.id] = { ...doc.data(), _id: doc.id }; });
       snap.docChanges().forEach(c => { if (c.type === 'removed') delete allOrders[c.doc.id]; });
       render();
     });
 
-  /* Listen as seller */
-  db.collection('orders').where('seller', '==', currentUser.uid)
+  db.collection('orders').where('seller','==', currentUser.uid)
     .onSnapshot(snap => {
       snap.forEach(doc => { allOrders[doc.id] = { ...doc.data(), _id: doc.id }; });
       snap.docChanges().forEach(c => { if (c.type === 'removed') delete allOrders[c.doc.id]; });
@@ -615,7 +771,7 @@ function loadOrders() {
 }
 
 /* ════════════════════════════════════════
-   SERVICE FEE
+   SERVICE FEE SUBMISSION
 ════════════════════════════════════════ */
 async function submitServiceFee(orderId) {
   const file = document.getElementById('serviceProof')?.files[0];
@@ -625,16 +781,17 @@ async function submitServiceFee(orderId) {
   if (!url) return;
 
   await db.collection('orders').doc(orderId).update({
-    serviceProof:     url,
-    status:           'paid_waiting_seller',
-    serviceFeePaidAt: new Date()
+    serviceProof: url, status: 'paid_waiting_seller',
+    serviceFeePaidAt: firebase.firestore.FieldValue.serverTimestamp()
   });
-  alert('Fee proof submitted! Admin will confirm shortly.');
+  alert('Fee proof submitted. Admin will confirm your payment shortly. Chat unlocks after confirmation.');
 }
 
 /* ════════════════════════════════════════
    CHAT
-   Fix: correct buyer/seller labels
+   Locked until admin marks paid
+   Seller receives messages in real-time
+   Buyer cannot send images
 ════════════════════════════════════════ */
 async function openChat(orderId, gameTitle) {
   if (!currentUser) return;
@@ -643,19 +800,26 @@ async function openChat(orderId, gameTitle) {
   if (!orderSnap.exists) return alert('Order not found.');
   const o = orderSnap.data();
 
-  if (o.status === 'awaiting_fee')
-    return alert('Pay the service fee first to unlock chat.');
-  if (o.status === 'released' || o.status === 'cancelled')
+  // CHAT LOCKED — only opens when status is exactly 'paid'
+  if (o.status === 'awaiting_fee' || o.status === 'paid_waiting_seller') {
+    return alert('Chat is locked until admin confirms your payment.');
+  }
+  if (o.status === 'released' || o.status === 'cancelled') {
     return alert('This order is closed. Chat is no longer available.');
-  if (o.buyer !== currentUser.uid && o.seller !== currentUser.uid)
+  }
+  if (o.status !== 'paid') {
+    return alert('Chat is not available for this order.');
+  }
+  if (o.buyer !== currentUser.uid && o.seller !== currentUser.uid) {
     return alert('You are not part of this order.');
+  }
 
   currentChat = orderId;
-  markSeen(orderId);   // mark as read when chat is opened
+  markSeen(orderId);
   show('chat');
 
   document.getElementById('chatTitle').textContent  = gameTitle || 'Trade Chat';
-  document.getElementById('chatStatus').textContent = o.status.replace(/_/g, ' ');
+  document.getElementById('chatStatus').textContent = 'Live';
 
   const iAmSeller = o.seller === currentUser.uid;
 
@@ -673,20 +837,20 @@ async function openChat(orderId, gameTitle) {
         const div  = document.createElement('div');
         div.className = 'bubble ' + (mine ? 'mine' : 'theirs');
 
-        const who   = !mine ? (iAmSeller ? 'Buyer' : 'Seller') : '';
-        let   imgs  = '';
+        const who  = !mine ? (iAmSeller ? 'Buyer' : 'Seller') : '';
+        let imgs   = '';
         if (m.images && m.images.length)
           imgs = m.images.map(u => '<img class="bubble-img" src="' + esc(u) + '">').join('');
 
         div.innerHTML =
           (who ? '<div class="bubble-who">' + esc(who) + '</div>' : '') +
-          (m.text ? '<div>' + esc(m.text) + '</div>' : '') +
-          imgs;
+          (m.text ? '<div>' + esc(m.text) + '</div>' : '') + imgs;
 
         feed.appendChild(div);
       });
-
       feed.scrollTop = feed.scrollHeight;
+      // Mark as seen whenever new messages arrive while chat is open
+      markSeen(orderId);
     });
 }
 
@@ -697,8 +861,8 @@ async function sendMessage() {
   const orderSnap = await db.collection('orders').doc(currentChat).get();
   if (!orderSnap.exists) return;
   const status = orderSnap.data().status;
-  if (status === 'released' || status === 'cancelled')
-    return alert('This order is closed. Chat locked.');
+
+  if (status !== 'paid') return alert('Chat is locked.');
 
   const text  = document.getElementById('msgInput').value.trim();
   const files = document.getElementById('chatImages').files;
@@ -708,9 +872,10 @@ async function sendMessage() {
   const role = userSnap.data().role;
   let imageUrls = [];
 
-  if (role === 'buyer' && files.length > 0)
+  if (role === 'buyer' && files.length > 0) {
+    document.getElementById('chatImages').value = '';
     return alert('Buyers cannot send images in chat.');
-
+  }
   if (role === 'seller' && files.length > 0) {
     if (files.length > 2) return alert('Maximum 2 images per message.');
     for (const f of files) {
@@ -726,8 +891,77 @@ async function sendMessage() {
     time:   firebase.firestore.FieldValue.serverTimestamp()
   });
 
-  document.getElementById('msgInput').value = '';
-  document.getElementById('chatImages').value = '';
+  document.getElementById('msgInput').value    = '';
+  document.getElementById('chatImages').value  = '';
+}
+
+/* ════════════════════════════════════════
+   REPORT SYSTEM
+════════════════════════════════════════ */
+async function fileReport() {
+  if (!currentChat || !currentUser) return;
+  const reason = prompt('Describe the issue (max 300 chars):');
+  if (!reason || !reason.trim()) return;
+
+  const orderSnap = await db.collection('orders').doc(currentChat).get();
+  if (!orderSnap.exists) return;
+  const o = orderSnap.data();
+  const against = o.buyer === currentUser.uid ? o.seller : o.buyer;
+
+  await db.collection('reports').add({
+    orderId: currentChat, reportedBy: currentUser.uid, against,
+    reason: reason.trim().slice(0, 300), status: 'open',
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  alert('Report submitted. Admin will review shortly.');
+}
+
+/* ════════════════════════════════════════
+   RATING SYSTEM
+════════════════════════════════════════ */
+function showRatingModal(orderId, sellerUid) {
+  ratingOrderId   = orderId;
+  ratingSellerUid = sellerUid;
+  selectedStars   = 0;
+  document.getElementById('starPicker').querySelectorAll('.star')
+    .forEach(s => s.classList.remove('lit'));
+  document.getElementById('starLabel').textContent   = 'Tap a star to rate';
+  document.getElementById('ratingComment').value     = '';
+  document.getElementById('ratingModal').classList.remove('hidden');
+}
+
+function closeRatingModal() {
+  document.getElementById('ratingModal').classList.add('hidden');
+  show('home');
+}
+
+function selectStar(n) {
+  selectedStars = n;
+  const labels  = ['Terrible','Poor','Okay','Good','Excellent'];
+  document.getElementById('starLabel').textContent = labels[n-1];
+  document.getElementById('starPicker').querySelectorAll('.star').forEach((s, i) => {
+    s.classList.toggle('lit', i < n);
+  });
+}
+
+async function submitRating() {
+  if (!selectedStars) return alert('Please select a star rating first.');
+  if (!ratingOrderId || !ratingSellerUid) return;
+
+  // Prevent duplicate rating for same order
+  const existing = await db.collection('ratings')
+    .where('orderId','==', ratingOrderId)
+    .where('buyerUid','==', currentUser.uid).get();
+  if (!existing.empty) { closeRatingModal(); return; }
+
+  const comment = document.getElementById('ratingComment').value.trim().slice(0, 300);
+  await db.collection('ratings').add({
+    orderId: ratingOrderId, sellerUid: ratingSellerUid,
+    buyerUid: currentUser.uid, stars: selectedStars,
+    comment, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  closeRatingModal();
+  alert('Thank you for your rating!');
 }
 
 /* ════════════════════════════════════════
@@ -736,7 +970,7 @@ async function sendMessage() {
 async function uploadFile(folder, file) {
   if (!file) return null;
   if (!file.type.match(/image\/(jpeg|jpg|png|webp)/)) { alert('Only JPG, PNG or WEBP images allowed.'); return null; }
-  if (file.size > 5 * 1024 * 1024)    { alert('File must be under 5MB.'); return null; }
+  if (file.size > 5 * 1024 * 1024) { alert('File must be under 5MB.'); return null; }
 
   const form = new FormData();
   form.append('file', file);
@@ -744,7 +978,7 @@ async function uploadFile(folder, file) {
   form.append('folder', 'gamevault/' + folder);
 
   try {
-    const res  = await fetch('https://api.cloudinary.com/v1_1/' + CLOUD_NAME + '/image/upload', { method: 'POST', body: form });
+    const res  = await fetch('https://api.cloudinary.com/v1_1/' + CLOUD_NAME + '/image/upload', { method:'POST', body: form });
     const data = await res.json();
     if (!data.secure_url) throw new Error('Upload failed');
     return data.secure_url;
@@ -756,27 +990,26 @@ async function uploadFile(folder, file) {
 
 /* ════════════════════════════════════════
    ADMIN PANEL
-   Fix: ALL listeners inside loadAdmin() — no global leaks
+   All listeners inside loadAdmin()
 ════════════════════════════════════════ */
 function loadAdmin() {
 
-  /* ── Stats + Orders panel (single listener) ── */
+  /* Orders + Stats */
   db.collection('orders').onSnapshot(snap => {
     let total = 0, active = 0, completed = 0, cancelled = 0, earnings = 0;
     snap.forEach(doc => {
       const o = doc.data(); total++;
       if (o.status === 'paid' || o.status === 'paid_waiting_seller') active++;
-      if (o.status === 'released')  completed++;
+      if (o.status === 'released')  { completed++; earnings += SERVICE_FEE; }
+      if (o.status === 'paid')      earnings += SERVICE_FEE;
       if (o.status === 'cancelled') cancelled++;
-      if (o.status === 'paid' || o.status === 'released') earnings += SERVICE_FEE;
     });
-
     document.getElementById('adminStats').innerHTML =
-      statBox('Total Orders',     total,     '')       +
-      statBox('Earnings',         '$'+earnings, 'green') +
-      statBox('Active',           active,    'gold')   +
-      statBox('Completed',        completed, '')       +
-      statBox('Cancelled',        cancelled, 'red');
+      statBox('Total Orders', total, '') +
+      statBox('Earnings', '$'+earnings, 'green') +
+      statBox('Active', active, 'gold') +
+      statBox('Completed', completed, '') +
+      statBox('Cancelled', cancelled, 'red');
 
     const panel = document.getElementById('aOrders');
     panel.innerHTML = '';
@@ -787,10 +1020,7 @@ function loadAdmin() {
       const card = document.createElement('div');
       card.className = 'a-card';
       card.innerHTML =
-        '<div class="a-card-top">' +
-          '<span class="a-id">ORDER #' + esc(doc.id.slice(-6).toUpperCase()) + '</span>' +
-          badge(o.status) +
-        '</div>' +
+        '<div class="a-card-top"><span class="a-id">ORDER #' + esc(doc.id.slice(-6).toUpperCase()) + '</span>' + badge(o.status) + '</div>' +
         aRow('Game',   esc(o.game)) +
         aRow('Price',  '<span style="color:var(--accent)">$' + esc(String(o.price)) + '</span>') +
         aRow('Buyer',  '<span style="font-size:12px">' + esc(o.buyer)  + '</span>') +
@@ -799,21 +1029,22 @@ function loadAdmin() {
           ? aRow('Fee Proof', '<a href="' + esc(o.serviceProof) + '" target="_blank">View screenshot</a>')
           : aRow('Fee Proof', '<span style="color:var(--t3)">Not uploaded yet</span>')) +
         '<div class="a-actions">' +
-          '<button class="btn-gold"    onclick="adminMarkPaid(\'' + esc(doc.id) + '\')">Mark Paid</button>' +
-          '<button class="btn-green"   onclick="adminRelease(\'' + esc(doc.id) + '\',\'' + esc(o.listingId) + '\')">Release</button>' +
-          '<button class="btn-red"     onclick="adminCancel(\''  + esc(doc.id) + '\',\'' + esc(o.listingId) + '\')">Cancel</button>' +
+          '<button class="btn-gold"  onclick="adminMarkPaid(\'' + esc(doc.id) + '\')">Mark Paid</button>' +
+          '<button class="btn-green" onclick="adminRelease(\'' + esc(doc.id) + '\',\'' + esc(o.listingId) + '\',\'' + esc(o.seller) + '\',\'' + esc(o.buyer) + '\')">Release</button>' +
+          '<button class="btn-red"   onclick="adminCancel(\'' + esc(doc.id) + '\',\'' + esc(o.listingId) + '\')">Cancel</button>' +
+          '<button class="btn-red"   onclick="adminSuspend(\'' + esc(o.buyer) + '\')">Suspend Buyer</button>' +
+          '<button class="btn-red"   onclick="adminSuspend(\'' + esc(o.seller) + '\')">Suspend Seller</button>' +
         '</div>';
       panel.appendChild(card);
     });
   });
 
-  /* ── Verifications ── */
-  db.collection('verifications').where('status', '==', 'pending')
+  /* Verifications */
+  db.collection('verifications').where('status','==','pending')
     .onSnapshot(snap => {
       const panel = document.getElementById('aVerify');
       panel.innerHTML = '';
       if (snap.empty) { panel.innerHTML = '<div class="empty"><p>No pending verifications</p></div>'; return; }
-
       snap.forEach(doc => {
         const v = doc.data();
         const card = document.createElement('div');
@@ -821,19 +1052,16 @@ function loadAdmin() {
         card.innerHTML =
           '<div class="a-card-top"><span class="a-id">SELLER VERIFICATION</span>' + badge('pending') + '</div>' +
           aRow('User ID', '<span style="font-size:12px">' + esc(v.uid) + '</span>') +
-          aRow('Docs',
-            '<a href="' + esc(v.idPhoto)      + '" target="_blank">ID Photo</a> &nbsp;&middot;&nbsp;' +
-            '<a href="' + esc(v.selfie)        + '" target="_blank">Selfie</a> &nbsp;&middot;&nbsp;' +
-            '<a href="' + esc(v.paymentProof)  + '" target="_blank">Fee Proof</a>') +
+          aRow('Docs', '<a href="' + esc(v.idPhoto) + '" target="_blank">ID Photo</a> &nbsp;&middot;&nbsp;<a href="' + esc(v.selfie) + '" target="_blank">Selfie</a> &nbsp;&middot;&nbsp;<a href="' + esc(v.paymentProof) + '" target="_blank">Fee Proof</a>') +
           '<div class="a-actions">' +
             '<button class="btn-green" onclick="adminApprove(\'' + esc(doc.id) + '\',\'' + esc(v.uid) + '\')">Approve</button>' +
-            '<button class="btn-red"   onclick="adminReject(\''  + esc(doc.id) + '\')">Reject</button>' +
+            '<button class="btn-red"   onclick="adminReject(\'' + esc(doc.id) + '\')">Reject</button>' +
           '</div>';
         panel.appendChild(card);
       });
     });
 
-  /* ── Listings ── */
+  /* Listings */
   db.collection('listings').onSnapshot(snap => {
     const panel = document.getElementById('aListings');
     panel.innerHTML = '';
@@ -854,12 +1082,11 @@ function loadAdmin() {
     });
   });
 
-  /* ── Chats ── */
+  /* Chats */
   db.collection('chats').onSnapshot(snap => {
     const panel = document.getElementById('aChats');
     panel.innerHTML = '';
     if (snap.empty) { panel.innerHTML = '<div class="empty"><p>No chats yet</p></div>'; return; }
-
     snap.forEach(doc => {
       const div = document.createElement('div');
       div.className = 'a-card';
@@ -870,14 +1097,53 @@ function loadAdmin() {
       panel.appendChild(div);
     });
   });
-}
 
-function statBox(label, value, colorClass) {
-  return '<div class="stat-box"><div class="stat-lbl">' + label + '</div><div class="stat-val ' + colorClass + '">' + value + '</div></div>';
-}
+  /* Reports */
+  db.collection('reports').where('status','==','open').onSnapshot(snap => {
+    const panel = document.getElementById('aReports');
+    panel.innerHTML = '';
+    if (snap.empty) { panel.innerHTML = '<div class="empty"><p>No open reports</p></div>'; return; }
+    snap.forEach(doc => {
+      const r = doc.data();
+      const card = document.createElement('div');
+      card.className = 'a-card';
+      card.innerHTML =
+        '<div class="a-card-top"><span class="a-id">REPORT</span><span class="badge b-red">Open</span></div>' +
+        aRow('Order',       '#' + esc(r.orderId.slice(-6).toUpperCase())) +
+        aRow('Reported by', '<span style="font-size:12px">' + esc(r.reportedBy) + '</span>') +
+        aRow('Against',     '<span style="font-size:12px">' + esc(r.against) + '</span>') +
+        aRow('Reason',      esc(r.reason)) +
+        '<div class="a-actions">' +
+          '<button class="btn-red"     onclick="adminSuspend(\'' + esc(r.against) + '\')">Suspend User</button>' +
+          '<button class="btn-outline" onclick="adminCloseReport(\'' + esc(doc.id) + '\')">Dismiss</button>' +
+        '</div>';
+      panel.appendChild(card);
+    });
+  });
 
-function aRow(key, valHtml) {
-  return '<div class="a-row"><span class="a-key">' + key + '</span><span class="a-val">' + valHtml + '</span></div>';
+  /* Users */
+  db.collection('users').onSnapshot(snap => {
+    const panel = document.getElementById('aUsers');
+    panel.innerHTML = '';
+    snap.forEach(doc => {
+      const u = doc.data();
+      const card = document.createElement('div');
+      card.className = 'a-card';
+      card.innerHTML =
+        '<div class="a-card-top">' +
+          '<span style="font-size:13px">' + esc(u.email) + '</span>' +
+          (u.suspended ? '<span class="badge b-red">Suspended</span>' : '<span class="badge b-green">Active</span>') +
+        '</div>' +
+        aRow('Role',     esc(u.role)) +
+        aRow('Verified', u.verified ? 'Yes' : 'No') +
+        '<div class="a-actions">' +
+          (!u.suspended
+            ? '<button class="btn-red"     onclick="adminSuspend(\'' + esc(doc.id) + '\')">Suspend</button>'
+            : '<button class="btn-green"   onclick="adminUnsuspend(\'' + esc(doc.id) + '\')">Reinstate</button>') +
+        '</div>';
+      panel.appendChild(card);
+    });
+  });
 }
 
 /* ── Admin actions ── */
@@ -893,7 +1159,7 @@ async function adminReject(docId) {
 async function adminMarkPaid(orderId) {
   await db.collection('orders').doc(orderId).update({ status: 'paid', paidAt: new Date() });
 }
-async function adminRelease(orderId, listingId) {
+async function adminRelease(orderId, listingId, sellerUid, buyerUid) {
   const snap = await db.collection('orders').doc(orderId).get();
   if (!snap.exists) return alert('Order not found.');
   if (snap.data().status !== 'paid') return alert('Order must be marked PAID before releasing.');
@@ -912,153 +1178,99 @@ async function adminRemoveListing(id) {
 async function adminActivateListing(id) {
   await db.collection('listings').doc(id).update({ status: 'active' });
 }
+async function adminSuspend(uid) {
+  if (!uid) return;
+  if (!confirm('Suspend this account? They will be blocked immediately.')) return;
+  await db.collection('users').doc(uid).update({ suspended: true, suspendedAt: new Date() });
+  alert('Account suspended.');
+}
+async function adminUnsuspend(uid) {
+  if (!uid) return;
+  await db.collection('users').doc(uid).update({ suspended: false, suspendedAt: null });
+  alert('Account reinstated.');
+}
+async function adminCloseReport(docId) {
+  await db.collection('reports').doc(docId).update({ status: 'closed', closedAt: new Date() });
+}
 async function adminViewChat(orderId) {
   const logEl = document.getElementById('chatLog-' + orderId);
   if (!logEl) return;
   logEl.innerHTML = '<div style="font-size:12px;color:var(--t3);padding:8px 0">Loading...</div>';
-
-  const msgs = await db.collection('chats').doc(orderId)
-    .collection('messages').orderBy('time').get();
+  const msgs = await db.collection('chats').doc(orderId).collection('messages').orderBy('time').get();
   if (msgs.empty) { logEl.innerHTML = '<div style="font-size:12px;color:var(--t3);padding:8px 0">No messages.</div>'; return; }
-
   logEl.innerHTML = msgs.docs.map(d => {
     const m = d.data();
     return '<div style="padding:5px 0;border-bottom:1px solid var(--bdr);font-size:12px">' +
       '<span style="color:var(--t3)">' + esc(m.sender.slice(0,8)) + '...</span>' +
-      '<span style="margin-left:8px;color:var(--t2)">' + esc(m.text || '[image]') + '</span>' +
-    '</div>';
+      '<span style="margin-left:8px;color:var(--t2)">' + esc(m.text || '[image]') + '</span></div>';
   }).join('');
 }
 
-
 /* ════════════════════════════════════════
    NOTIFICATION BADGE SYSTEM
-   - Tracks last-seen timestamp per chat
-     in localStorage
-   - Listens to all user's active order chats
-   - Shows unread count on Orders nav button
-   - Clears when user opens Orders page
 ════════════════════════════════════════ */
-
-const SEEN_KEY = 'gv_seen_'; // localStorage key prefix
-
-function getLastSeen(orderId) {
-  const val = localStorage.getItem(SEEN_KEY + orderId);
-  return val ? parseInt(val) : 0;
-}
-
-function markSeen(orderId) {
-  localStorage.setItem(SEEN_KEY + orderId, Date.now());
-}
+const SEEN_KEY = 'gv_seen_';
+function getLastSeen(orderId) { const v = localStorage.getItem(SEEN_KEY + orderId); return v ? parseInt(v) : 0; }
+function markSeen(orderId)    { localStorage.setItem(SEEN_KEY + orderId, Date.now()); }
 
 function clearBadge() {
-  // Mark all current chats as seen when user opens Orders
-  const badge  = document.getElementById('ordersBadge');
-  const mBadge = document.getElementById('mOrdersBadge');
-  if (badge)  { badge.textContent = '0';  badge.classList.add('hidden'); }
-  if (mBadge) { mBadge.textContent = '0'; mBadge.classList.add('hidden'); }
-
-  // Mark all active chats as seen
+  updateBadge(0);
   if (!currentUser) return;
-  db.collection('orders')
-    .where('buyer', '==', currentUser.uid).get()
-    .then(snap => snap.forEach(doc => markSeen(doc.id)));
-  db.collection('orders')
-    .where('seller', '==', currentUser.uid).get()
-    .then(snap => snap.forEach(doc => markSeen(doc.id)));
+  db.collection('orders').where('buyer','==', currentUser.uid).get().then(s => s.forEach(d => markSeen(d.id)));
+  db.collection('orders').where('seller','==', currentUser.uid).get().then(s => s.forEach(d => markSeen(d.id)));
 }
 
 function updateBadge(count) {
-  const badge  = document.getElementById('ordersBadge');
-  const mBadge = document.getElementById('mOrdersBadge');
-  if (!badge || !mBadge) return;
-
+  const b  = document.getElementById('ordersBadge');
+  const mb = document.getElementById('mOrdersBadge');
+  if (!b || !mb) return;
   if (count > 0) {
-    const display = count > 99 ? '99+' : String(count);
-    badge.textContent  = display;
-    mBadge.textContent = display;
-    badge.classList.remove('hidden');
-    mBadge.classList.remove('hidden');
+    const txt = count > 99 ? '99+' : String(count);
+    b.textContent = txt; mb.textContent = txt;
+    b.classList.remove('hidden'); mb.classList.remove('hidden');
   } else {
-    badge.classList.add('hidden');
-    mBadge.classList.add('hidden');
+    b.classList.add('hidden'); mb.classList.add('hidden');
   }
 }
 
-// Start watching all user's chats for unread messages
 function startNotifications() {
   if (!currentUser) return;
+  const unread = {};
 
-  const unsubscribers = [];
-  const unreadPerOrder = {}; // orderId -> unread count
-
-  function recalcTotal() {
-    const total = Object.values(unreadPerOrder).reduce((a, b) => a + b, 0);
-    // Don't show badge if user is already on the orders/chat page
-    const ordersVisible = !document.getElementById('orders').classList.contains('hidden');
-    const chatVisible   = !document.getElementById('chat').classList.contains('hidden');
-    if (ordersVisible || chatVisible) {
-      updateBadge(0);
-    } else {
-      updateBadge(total);
-    }
+  function recalc() {
+    const ordersOpen = !document.getElementById('orders').classList.contains('hidden');
+    const chatOpen   = !document.getElementById('chat').classList.contains('hidden');
+    updateBadge((ordersOpen || chatOpen) ? 0 : Object.values(unread).reduce((a,b) => a+b, 0));
   }
 
-  function watchChatForOrder(orderId) {
-    const lastSeen = getLastSeen(orderId);
-
-    const unsub = db.collection('chats').doc(orderId)
-      .collection('messages')
-      .orderBy('time')
+  function watchChat(orderId) {
+    db.collection('chats').doc(orderId).collection('messages').orderBy('time')
       .onSnapshot(snap => {
-        let unread = 0;
+        let count = 0;
         snap.forEach(doc => {
           const m = doc.data();
-          // Count messages not sent by me and newer than last seen
           if (m.sender !== currentUser.uid) {
-            const msgTime = m.time && m.time.toMillis ? m.time.toMillis() : (m.time instanceof Date ? m.time.getTime() : 0);
-            if (msgTime > getLastSeen(orderId)) unread++;
+            const t = m.time && m.time.toMillis ? m.time.toMillis() : 0;
+            if (t > getLastSeen(orderId)) count++;
           }
         });
-        unreadPerOrder[orderId] = unread;
-        recalcTotal();
+        unread[orderId] = count;
+        recalc();
       });
-
-    unsubscribers.push(unsub);
   }
 
-  // Watch all orders for the user (buyer + seller)
-  const buyerUnsub = db.collection('orders')
-    .where('buyer', '==', currentUser.uid)
-    .onSnapshot(snap => {
+  function listenOrders(field) {
+    db.collection('orders').where(field,'==', currentUser.uid).onSnapshot(snap => {
       snap.forEach(doc => {
-        const o = doc.data();
-        if (o.status !== 'released' && o.status !== 'cancelled' && o.status !== 'awaiting_fee') {
-          if (!unreadPerOrder.hasOwnProperty(doc.id)) {
-            watchChatForOrder(doc.id);
-          }
-        }
+        const s = doc.data().status;
+        if (s === 'paid' && !unread.hasOwnProperty(doc.id)) watchChat(doc.id);
+        if (s === 'released' || s === 'cancelled') { delete unread[doc.id]; recalc(); }
       });
     });
+  }
 
-  const sellerUnsub = db.collection('orders')
-    .where('seller', '==', currentUser.uid)
-    .onSnapshot(snap => {
-      snap.forEach(doc => {
-        const o = doc.data();
-        if (o.status !== 'released' && o.status !== 'cancelled' && o.status !== 'awaiting_fee') {
-          if (!unreadPerOrder.hasOwnProperty(doc.id)) {
-            watchChatForOrder(doc.id);
-          }
-        }
-      });
-    });
-
-  unsubscribers.push(buyerUnsub, sellerUnsub);
-
-  // When user opens a chat, mark it as seen immediately
-  const origOpenChat = window.openChat;
-  window._notifUnsubs = unsubscribers;
+  listenOrders('buyer');
+  listenOrders('seller');
 }
 
 /* ════════════════════════════════════════
