@@ -13,93 +13,100 @@
 </head>
 <body>
 
+<!-- ═══════════════════════ HEADER / NAV ═══════════════════════ -->
 <header id="appHeader" class="hidden">
   <div class="header-inner">
     <div class="logo">GAME<span>VAULT</span></div>
-    <nav id="nav">
-      <button class="nav-btn" onclick="show('home')">Home</button>
-      <button class="nav-btn" id="sellBtn" style="display:none" onclick="show('sell')">Sell</button>
-      <button class="nav-btn" onclick="show('orders')">Orders</button>
+    <nav id="desktopNav">
+      <button class="nav-btn" onclick="show('home');loadListings()">Home</button>
+      <button class="nav-btn" id="sellBtn"   style="display:none" onclick="show('sell')">Sell</button>
+      <button class="nav-btn" onclick="show('orders');loadOrders()">Orders</button>
       <button class="nav-btn" id="verifyBtn" style="display:none" onclick="show('verification')">Verify</button>
       <button class="nav-btn" id="payoutBtn" style="display:none" onclick="show('payout')">Payout</button>
       <button class="nav-btn admin-btn" id="adminBtn" style="display:none" onclick="show('admin')">Admin</button>
-      <button class="nav-btn logout-btn" onclick="logout()">Logout</button>
+      <button class="nav-btn logout-btn" onclick="doLogout()">Logout</button>
     </nav>
     <button class="hamburger" onclick="toggleMenu()">&#9776;</button>
   </div>
   <div class="mobile-nav hidden" id="mobileNav">
-    <button onclick="show('home');closeMenu()">Home</button>
-    <button id="mSellBtn" style="display:none" onclick="show('sell');closeMenu()">Sell</button>
-    <button onclick="show('orders');closeMenu()">Orders</button>
+    <button onclick="show('home');loadListings();closeMenu()">Home</button>
+    <button id="mSellBtn"   style="display:none" onclick="show('sell');closeMenu()">Sell</button>
+    <button onclick="show('orders');loadOrders();closeMenu()">Orders</button>
     <button id="mVerifyBtn" style="display:none" onclick="show('verification');closeMenu()">Verify</button>
     <button id="mPayoutBtn" style="display:none" onclick="show('payout');closeMenu()">Payout</button>
-    <button id="mAdminBtn" class="admin-btn" style="display:none" onclick="show('admin');closeMenu()">Admin</button>
-    <button class="logout-btn" onclick="logout()">Logout</button>
+    <button id="mAdminBtn"  style="display:none" class="admin-btn" onclick="show('admin');closeMenu()">Admin</button>
+    <button class="logout-btn" onclick="doLogout()">Logout</button>
   </div>
 </header>
 
-<main class="main">
+<main>
 
-  <!-- AUTH -->
+  <!-- ═══ AUTH ═══ -->
   <section id="auth" class="page">
-    <div class="auth-wrap">
+    <div class="auth-box">
       <div class="auth-logo">GAME<span>VAULT</span></div>
-      <p class="auth-sub">P2P Game Account Marketplace</p>
-      <div class="tab-switch">
-        <button class="tab-btn active" id="tabLogin" onclick="switchAuthTab('login')">Login</button>
-        <button class="tab-btn" id="tabSignup" onclick="switchAuthTab('signup')">Sign Up</button>
+      <p class="auth-tagline">P2P Gaming Account Marketplace</p>
+      <div class="tab-row">
+        <button class="tab active" id="tabLogin"  onclick="authTab('login')">Login</button>
+        <button class="tab"        id="tabSignup" onclick="authTab('signup')">Sign Up</button>
       </div>
+
+      <!-- Login -->
       <div id="loginForm">
         <div class="field">
-          <label class="field-label">Email</label>
+          <label class="flabel">Email</label>
           <input id="loginEmail" type="email" placeholder="you@email.com">
         </div>
         <div class="field">
-          <label class="field-label">Password</label>
+          <label class="flabel">Password</label>
           <input id="loginPassword" type="password" placeholder="••••••••">
         </div>
-        <button class="btn-primary full" onclick="login()">Login</button>
+        <div id="loginMsg" class="msg-box hidden"></div>
+        <button class="btn-primary w100" onclick="doLogin()">Login</button>
       </div>
+
+      <!-- Signup -->
       <div id="signupForm" class="hidden">
         <div class="field">
-          <label class="field-label">Email</label>
+          <label class="flabel">Email</label>
           <input id="signupEmail" type="email" placeholder="you@email.com">
         </div>
         <div class="field">
-          <label class="field-label">Password <span class="field-hint">(min 6 chars)</span></label>
+          <label class="flabel">Password <span class="fhint">(min 6 chars)</span></label>
           <input id="signupPassword" type="password" placeholder="••••••••">
         </div>
         <div class="field">
-          <label class="field-label">I want to</label>
+          <label class="flabel">I want to</label>
           <select id="signupRole">
             <option value="buyer">Buy game accounts</option>
             <option value="seller">Sell game accounts</option>
           </select>
         </div>
-        <button class="btn-primary full" onclick="signup()">Create Account</button>
+        <div id="signupMsg" class="msg-box hidden"></div>
+        <button class="btn-primary w100" onclick="doSignup()">Create Account</button>
       </div>
     </div>
   </section>
 
-  <!-- TERMS -->
+  <!-- ═══ TERMS ═══ -->
   <section id="risk" class="page hidden">
     <div class="page-card">
-      <h2 class="page-title">Terms &amp; Risk Agreement</h2>
-      <div class="terms-box">
-        <div class="terms-section">
-          <div class="terms-heading">1. Platform Role</div>
+      <h2 class="ptitle">Terms &amp; Risk Agreement</h2>
+      <div class="terms-scroll">
+        <div class="terms-block">
+          <div class="terms-head">1. Platform Role</div>
           <p>GameVault Market only connects buyers and sellers. We do NOT own, sell, or guarantee any game accounts.</p>
         </div>
-        <div class="terms-section">
-          <div class="terms-heading">2. No Warranty</div>
+        <div class="terms-block">
+          <div class="terms-head">2. No Warranty</div>
           <p>We are not responsible for account bans, recoveries, scams, or losses outside platform protection.</p>
         </div>
-        <div class="terms-section">
-          <div class="terms-heading">3. Payments</div>
+        <div class="terms-block">
+          <div class="terms-head">3. Payments</div>
           <p>All fees paid (verification &amp; service fee) are <strong>NON-REFUNDABLE</strong>.</p>
         </div>
-        <div class="terms-section">
-          <div class="terms-heading">4. Forbidden Actions</div>
+        <div class="terms-block">
+          <div class="terms-head">4. Forbidden Actions</div>
           <ul class="terms-list">
             <li>No scamming or fraudulent activity</li>
             <li>No chargebacks</li>
@@ -107,161 +114,151 @@
             <li>No bypassing the GameVault system</li>
           </ul>
         </div>
-        <div class="terms-section">
-          <div class="terms-heading">5. Ban Policy</div>
-          <p>Violating rules results in permanent ban and account freeze.</p>
+        <div class="terms-block">
+          <div class="terms-head">5. Ban Policy</div>
+          <p>Violating rules = permanent ban and account freeze.</p>
         </div>
-        <div class="terms-section">
-          <div class="terms-heading">6. Risk Notice</div>
+        <div class="terms-block">
+          <div class="terms-head">6. Risk Notice</div>
           <p>Trading game accounts always carries risk. You agree to trade at your own responsibility.</p>
         </div>
       </div>
-      <div class="checkbox-row">
+      <div class="check-row">
         <input type="checkbox" id="agreeTerms">
         <label for="agreeTerms">I have read and agree to the Terms &amp; Risk Agreement</label>
       </div>
-      <button class="btn-primary full" onclick="acceptTerms()">Continue to GameVault</button>
+      <button class="btn-primary w100" onclick="acceptTerms()">Continue to GameVault</button>
     </div>
   </section>
 
-  <!-- VERIFICATION -->
+  <!-- ═══ VERIFICATION ═══ -->
   <section id="verification" class="page hidden">
     <div class="page-card">
-      <h2 class="page-title">Seller Verification</h2>
-      <p class="page-sub">Complete both steps to start selling</p>
-      <div class="step-block">
-        <div class="step-header">
-          <span class="step-num">01</span>
-          <span class="step-title">Pay $3 Verification Fee</span>
-        </div>
-        <div class="pay-methods">
-          <div class="pay-method">
-            <span class="pay-label">Skrill</span>
-            <span class="pay-value">gamevaultmarket@gmail.com</span>
-          </div>
-          <div class="pay-method">
-            <span class="pay-label">USDT TRC20</span>
-            <span class="pay-value">0x992d0E36A7409F0c9228B51C6bB8F875b1A4Af3B</span>
-          </div>
-          <div class="pay-method">
-            <span class="pay-label">Grey</span>
-            <span class="pay-value">212286724510</span>
-          </div>
+      <h2 class="ptitle">Seller Verification</h2>
+      <p class="psub">Complete both steps to start selling</p>
+
+      <div class="step-card">
+        <div class="step-hdr"><span class="step-num">01</span><span class="step-title">Pay $3 Verification Fee</span></div>
+        <div class="pay-list">
+          <div class="pay-row"><span class="pay-key">Skrill</span><span class="pay-val">gamevaultmarket@gmail.com</span></div>
+          <div class="pay-row"><span class="pay-key">USDT TRC20</span><span class="pay-val">0x992d0E36A7409F0c9228B51C6bB8F875b1A4Af3B</span></div>
+          <div class="pay-row"><span class="pay-key">Grey</span><span class="pay-val">212286724510</span></div>
         </div>
       </div>
-      <div class="step-block">
-        <div class="step-header">
-          <span class="step-num">02</span>
-          <span class="step-title">Upload Documents</span>
-        </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><span class="step-num">02</span><span class="step-title">Upload Documents</span></div>
         <div class="upload-grid">
-          <div class="upload-field">
-            <div class="upload-label">ID Card / Passport</div>
-            <input type="file" id="idPhoto" accept="image/*" class="file-input">
+          <div class="upload-item">
+            <div class="upload-lbl">ID Card / Passport</div>
+            <input type="file" id="idPhoto" accept="image/*" class="file-inp">
           </div>
-          <div class="upload-field">
-            <div class="upload-label">Selfie Holding ID</div>
-            <input type="file" id="selfiePhoto" accept="image/*" class="file-input">
+          <div class="upload-item">
+            <div class="upload-lbl">Selfie Holding ID</div>
+            <input type="file" id="selfiePhoto" accept="image/*" class="file-inp">
           </div>
-          <div class="upload-field">
-            <div class="upload-label">Payment Proof Screenshot</div>
-            <input type="file" id="paymentProof" accept="image/*" class="file-input">
+          <div class="upload-item">
+            <div class="upload-lbl">Payment Proof Screenshot</div>
+            <input type="file" id="paymentProof" accept="image/*" class="file-inp">
           </div>
         </div>
       </div>
-      <div id="verifyMsg" class="status-msg hidden"></div>
-      <button class="btn-primary full" onclick="submitVerification()">Submit Verification</button>
+
+      <div id="verifyMsg" class="msg-box hidden"></div>
+      <button class="btn-primary w100" onclick="submitVerification()">Submit Verification</button>
     </div>
   </section>
 
-  <!-- PAYOUT -->
+  <!-- ═══ PAYOUT ═══ -->
   <section id="payout" class="page hidden">
     <div class="page-card">
-      <h2 class="page-title">Set Payout Method</h2>
-      <p class="page-sub">Where should we send your earnings?</p>
+      <h2 class="ptitle">Set Payout Method</h2>
+      <p class="psub">Where should we send your earnings?</p>
       <div class="field">
-        <label class="field-label">Payment Method</label>
+        <label class="flabel">Payment Method</label>
         <select id="payoutMethod">
           <option value="Skrill">Skrill</option>
           <option value="USDT">USDT (TRC20)</option>
           <option value="Grey">Grey</option>
+          <option value="Bank">Bank Transfer</option>
         </select>
       </div>
       <div class="field">
-        <label class="field-label">Email / Wallet / Account Number</label>
+        <label class="flabel">Email / Wallet / Account Number</label>
         <input id="payoutAddress" placeholder="Enter your payment address">
       </div>
-      <button class="btn-primary full" onclick="savePayout()">Save &amp; Continue</button>
+      <div id="payoutMsg" class="msg-box hidden"></div>
+      <button class="btn-primary w100" onclick="savePayout()">Save &amp; Continue</button>
     </div>
   </section>
 
-  <!-- HOME -->
+  <!-- ═══ HOME — LISTINGS ═══ -->
   <section id="home" class="page hidden">
-    <div class="section-header">
-      <h2 class="section-title">Listings</h2>
-      <span class="listing-count" id="listingCount"></span>
+    <div class="sec-hdr">
+      <h2 class="sec-title">Listings</h2>
+      <span class="sec-count" id="listingCount"></span>
     </div>
     <div id="listings" class="listings-grid"></div>
-    <div id="noListings" class="empty-state hidden">
+    <div id="noListings" class="empty hidden">
       <div class="empty-icon">&#9670;</div>
       <p>No listings available right now</p>
     </div>
   </section>
 
-  <!-- SELL -->
+  <!-- ═══ SELL ═══ -->
   <section id="sell" class="page hidden">
     <div class="page-card">
-      <h2 class="page-title">Create Listing</h2>
+      <h2 class="ptitle">Create Listing</h2>
       <div class="field">
-        <label class="field-label">Game Name</label>
+        <label class="flabel">Game Name</label>
         <input id="game" placeholder="e.g. Valorant, FIFA 25, Genshin Impact">
       </div>
       <div class="field">
-        <label class="field-label">Account Details</label>
+        <label class="flabel">Account Details</label>
         <textarea id="details" placeholder="Rank, level, skins, characters, coins..."></textarea>
       </div>
       <div class="field">
-        <label class="field-label">Price (USD)</label>
-        <input id="price" type="number" min="1" placeholder="e.g. 50">
+        <label class="flabel">Price (USD)</label>
+        <input id="price" type="number" min="1" max="10000" placeholder="e.g. 50">
       </div>
       <div class="field">
-        <label class="field-label">Screenshot <span class="field-hint">(optional)</span></label>
-        <input type="file" id="listingImg" accept="image/*" class="file-input">
+        <label class="flabel">Screenshot <span class="fhint">(optional)</span></label>
+        <input type="file" id="listingImg" accept="image/*" class="file-inp">
       </div>
-      <div id="sellMsg" class="status-msg hidden"></div>
-      <button class="btn-primary full" onclick="createListing()">Post Listing</button>
+      <div id="sellMsg" class="msg-box hidden"></div>
+      <button class="btn-primary w100" onclick="createListing()">Post Listing</button>
     </div>
   </section>
 
-  <!-- ORDERS -->
+  <!-- ═══ ORDERS ═══ -->
   <section id="orders" class="page hidden">
-    <div class="section-header">
-      <h2 class="section-title">My Orders</h2>
+    <div class="sec-hdr">
+      <h2 class="sec-title">My Orders</h2>
     </div>
     <div id="ordersList"></div>
-    <div id="noOrders" class="empty-state hidden">
+    <div id="noOrders" class="empty hidden">
       <div class="empty-icon">&#9670;</div>
       <p>No orders yet</p>
     </div>
   </section>
 
-  <!-- ORDER DETAIL -->
+  <!-- ═══ ORDER DETAIL ═══ -->
   <section id="order" class="page hidden">
     <div id="orderBox"></div>
   </section>
 
-  <!-- CHAT -->
+  <!-- ═══ CHAT ═══ -->
   <section id="chat" class="page hidden">
     <div class="chat-wrap">
-      <div class="chat-header">
-        <button class="back-btn" onclick="show('orders')">&#8592; Back</button>
+      <div class="chat-hdr">
+        <button class="back-btn" onclick="show('orders');loadOrders()">&#8592; Back</button>
         <span class="chat-title" id="chatTitle">Trade Chat</span>
-        <span class="chat-badge" id="chatStatus"></span>
+        <span class="chat-pill" id="chatStatus"></span>
       </div>
-      <div id="messages" class="messages-box"></div>
-      <div class="chat-composer">
+      <div id="messages" class="msg-feed"></div>
+      <div class="composer">
         <input id="msgInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMessage()">
-        <label class="attach-btn" title="Attach image (sellers only)">
+        <label class="attach-lbl" title="Attach image (sellers only)">
           <span>&#128247;</span>
           <input type="file" id="chatImages" accept="image/*" multiple>
         </label>
@@ -270,20 +267,20 @@
     </div>
   </section>
 
-  <!-- ADMIN -->
+  <!-- ═══ ADMIN ═══ -->
   <section id="admin" class="page hidden">
-    <h2 class="section-title" style="margin-bottom:20px">Admin Panel</h2>
-    <div id="adminStats" class="admin-stats"></div>
+    <h2 class="sec-title" style="margin-bottom:20px">Admin Panel</h2>
+    <div id="adminStats" class="stats-row"></div>
     <div class="admin-tabs">
-      <button class="atab active" onclick="adminTab(this,'aVerify')">Verifications</button>
-      <button class="atab" onclick="adminTab(this,'aOrders')">Orders</button>
-      <button class="atab" onclick="adminTab(this,'aListings')">Listings</button>
-      <button class="atab" onclick="adminTab(this,'aChats')">Chats</button>
+      <button class="atab active" onclick="aTab(this,'aVerify')">Verifications</button>
+      <button class="atab" onclick="aTab(this,'aOrders')">Orders</button>
+      <button class="atab" onclick="aTab(this,'aListings')">Listings</button>
+      <button class="atab" onclick="aTab(this,'aChats')">Chats</button>
     </div>
-    <div id="aVerify" class="admin-panel"></div>
-    <div id="aOrders" class="admin-panel hidden"></div>
-    <div id="aListings" class="admin-panel hidden"></div>
-    <div id="aChats" class="admin-panel hidden"></div>
+    <div id="aVerify"   class="a-panel"></div>
+    <div id="aOrders"   class="a-panel hidden"></div>
+    <div id="aListings" class="a-panel hidden"></div>
+    <div id="aChats"    class="a-panel hidden"></div>
   </section>
 
 </main>
