@@ -20,7 +20,7 @@
     <nav id="desktopNav">
       <button class="nav-btn" onclick="show('home');loadListings()">Home</button>
       <button class="nav-btn" id="sellBtn"   style="display:none" onclick="show('sell')">Sell</button>
-      <button class="nav-btn" onclick="show('orders');loadOrders()">Orders</button>
+      <button class="nav-btn" id="ordersBtn" onclick="show('orders');loadOrders();clearBadge()">Orders <span id="ordersBadge" class="nav-badge hidden">0</span></button>
       <button class="nav-btn" id="verifyBtn" style="display:none" onclick="show('verification')">Verify</button>
       <button class="nav-btn" id="payoutBtn" style="display:none" onclick="show('payout')">Payout</button>
       <button class="nav-btn admin-btn" id="adminBtn" style="display:none" onclick="show('admin')">Admin</button>
@@ -31,7 +31,7 @@
   <div class="mobile-nav hidden" id="mobileNav">
     <button onclick="show('home');loadListings();closeMenu()">Home</button>
     <button id="mSellBtn"   style="display:none" onclick="show('sell');closeMenu()">Sell</button>
-    <button onclick="show('orders');loadOrders();closeMenu()">Orders</button>
+    <button onclick="show('orders');loadOrders();clearBadge();closeMenu()">Orders <span id="mOrdersBadge" class="nav-badge hidden">0</span></button>
     <button id="mVerifyBtn" style="display:none" onclick="show('verification');closeMenu()">Verify</button>
     <button id="mPayoutBtn" style="display:none" onclick="show('payout');closeMenu()">Payout</button>
     <button id="mAdminBtn"  style="display:none" class="admin-btn" onclick="show('admin');closeMenu()">Admin</button>
