@@ -13,13 +13,13 @@
 </head>
 <body>
 
-<!-- ═══════════════════════ HEADER / NAV ═══════════════════════ -->
+<!-- HEADER -->
 <header id="appHeader" class="hidden">
   <div class="header-inner">
     <div class="logo">GAME<span>VAULT</span></div>
     <nav id="desktopNav">
       <button class="nav-btn" onclick="show('home');loadListings()">Home</button>
-      <button class="nav-btn" id="sellBtn"   style="display:none" onclick="show('sell')">Sell</button>
+      <button class="nav-btn" id="sellBtn" style="display:none" onclick="show('sell')">Sell</button>
       <button class="nav-btn" id="ordersBtn" onclick="show('orders');loadOrders();clearBadge()">Orders <span id="ordersBadge" class="nav-badge hidden">0</span></button>
       <button class="nav-btn" id="verifyBtn" style="display:none" onclick="show('verification')">Verify</button>
       <button class="nav-btn" id="payoutBtn" style="display:none" onclick="show('payout')">Payout</button>
@@ -30,28 +30,50 @@
   </div>
   <div class="mobile-nav hidden" id="mobileNav">
     <button onclick="show('home');loadListings();closeMenu()">Home</button>
-    <button id="mSellBtn"   style="display:none" onclick="show('sell');closeMenu()">Sell</button>
+    <button id="mSellBtn" style="display:none" onclick="show('sell');closeMenu()">Sell</button>
     <button onclick="show('orders');loadOrders();clearBadge();closeMenu()">Orders <span id="mOrdersBadge" class="nav-badge hidden">0</span></button>
     <button id="mVerifyBtn" style="display:none" onclick="show('verification');closeMenu()">Verify</button>
     <button id="mPayoutBtn" style="display:none" onclick="show('payout');closeMenu()">Payout</button>
-    <button id="mAdminBtn"  style="display:none" class="admin-btn" onclick="show('admin');closeMenu()">Admin</button>
+    <button id="mAdminBtn" style="display:none" class="admin-btn" onclick="show('admin');closeMenu()">Admin</button>
     <button class="logout-btn" onclick="doLogout()">Logout</button>
   </div>
 </header>
 
+<!-- RATING MODAL -->
+<div id="ratingModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-title">Rate This Seller</div>
+    <p class="modal-sub">How was your experience? Helps the community stay safe.</p>
+    <div class="star-picker" id="starPicker">
+      <span class="star" onclick="selectStar(1)">&#9733;</span>
+      <span class="star" onclick="selectStar(2)">&#9733;</span>
+      <span class="star" onclick="selectStar(3)">&#9733;</span>
+      <span class="star" onclick="selectStar(4)">&#9733;</span>
+      <span class="star" onclick="selectStar(5)">&#9733;</span>
+    </div>
+    <div id="starLabel" class="star-label">Tap a star to rate</div>
+    <div class="field" style="margin-top:14px">
+      <label class="flabel">Comment <span class="fhint">(optional)</span></label>
+      <textarea id="ratingComment" placeholder="Describe your experience..." style="min-height:70px"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="btn-primary" style="flex:1" onclick="submitRating()">Submit Rating</button>
+      <button class="btn-outline" onclick="closeRatingModal()">Skip</button>
+    </div>
+  </div>
+</div>
+
 <main>
 
-  <!-- ═══ AUTH ═══ -->
+  <!-- AUTH -->
   <section id="auth" class="page">
     <div class="auth-box">
       <div class="auth-logo">GAME<span>VAULT</span></div>
       <p class="auth-tagline">P2P Gaming Account Marketplace</p>
       <div class="tab-row">
-        <button class="tab active" id="tabLogin"  onclick="authTab('login')">Login</button>
-        <button class="tab"        id="tabSignup" onclick="authTab('signup')">Sign Up</button>
+        <button class="tab active" id="tabLogin" onclick="authTab('login')">Login</button>
+        <button class="tab" id="tabSignup" onclick="authTab('signup')">Sign Up</button>
       </div>
-
-      <!-- Login -->
       <div id="loginForm">
         <div class="field">
           <label class="flabel">Email</label>
@@ -64,8 +86,6 @@
         <div id="loginMsg" class="msg-box hidden"></div>
         <button class="btn-primary w100" onclick="doLogin()">Login</button>
       </div>
-
-      <!-- Signup -->
       <div id="signupForm" class="hidden">
         <div class="field">
           <label class="flabel">Email</label>
@@ -88,7 +108,21 @@
     </div>
   </section>
 
-  <!-- ═══ TERMS ═══ -->
+  <!-- VERIFY EMAIL -->
+  <section id="verifyEmail" class="page hidden">
+    <div class="page-card" style="text-align:center">
+      <div style="font-size:40px;margin-bottom:14px">&#9993;</div>
+      <h2 class="ptitle">Check Your Email</h2>
+      <p class="psub" style="margin-top:8px">We sent a verification link to your email address. Click it to activate your account.</p>
+      <div style="margin:20px 0;padding:14px;background:var(--bg3);border-radius:var(--r);font-size:13px;color:var(--t2)">
+        Did not receive it? Check your spam folder or tap below to resend.
+      </div>
+      <button class="btn-outline w100" onclick="resendVerification()">Resend Verification Email</button>
+      <button class="btn-primary w100" style="margin-top:10px" onclick="checkVerified()">I Verified — Continue</button>
+    </div>
+  </section>
+
+  <!-- TERMS -->
   <section id="risk" class="page hidden">
     <div class="page-card">
       <h2 class="ptitle">Terms &amp; Risk Agreement</h2>
@@ -120,7 +154,7 @@
         </div>
         <div class="terms-block">
           <div class="terms-head">6. Risk Notice</div>
-          <p>Trading game accounts always carries risk. You agree to trade at your own responsibility.</p>
+          <p>Trading game accounts carries risk. You agree to trade at your own responsibility.</p>
         </div>
       </div>
       <div class="check-row">
@@ -131,12 +165,11 @@
     </div>
   </section>
 
-  <!-- ═══ VERIFICATION ═══ -->
+  <!-- VERIFICATION -->
   <section id="verification" class="page hidden">
     <div class="page-card">
       <h2 class="ptitle">Seller Verification</h2>
       <p class="psub">Complete both steps to start selling</p>
-
       <div class="step-card">
         <div class="step-hdr"><span class="step-num">01</span><span class="step-title">Pay $3 Verification Fee</span></div>
         <div class="pay-list">
@@ -145,31 +178,20 @@
           <div class="pay-row"><span class="pay-key">Grey</span><span class="pay-val">212286724510</span></div>
         </div>
       </div>
-
       <div class="step-card">
         <div class="step-hdr"><span class="step-num">02</span><span class="step-title">Upload Documents</span></div>
         <div class="upload-grid">
-          <div class="upload-item">
-            <div class="upload-lbl">ID Card / Passport</div>
-            <input type="file" id="idPhoto" accept="image/*" class="file-inp">
-          </div>
-          <div class="upload-item">
-            <div class="upload-lbl">Selfie Holding ID</div>
-            <input type="file" id="selfiePhoto" accept="image/*" class="file-inp">
-          </div>
-          <div class="upload-item">
-            <div class="upload-lbl">Payment Proof Screenshot</div>
-            <input type="file" id="paymentProof" accept="image/*" class="file-inp">
-          </div>
+          <div class="upload-item"><div class="upload-lbl">ID Card / Passport</div><input type="file" id="idPhoto" accept="image/*" class="file-inp"></div>
+          <div class="upload-item"><div class="upload-lbl">Selfie Holding ID</div><input type="file" id="selfiePhoto" accept="image/*" class="file-inp"></div>
+          <div class="upload-item"><div class="upload-lbl">Payment Proof Screenshot</div><input type="file" id="paymentProof" accept="image/*" class="file-inp"></div>
         </div>
       </div>
-
       <div id="verifyMsg" class="msg-box hidden"></div>
       <button class="btn-primary w100" onclick="submitVerification()">Submit Verification</button>
     </div>
   </section>
 
-  <!-- ═══ PAYOUT ═══ -->
+  <!-- PAYOUT -->
   <section id="payout" class="page hidden">
     <div class="page-card">
       <h2 class="ptitle">Set Payout Method</h2>
@@ -192,7 +214,7 @@
     </div>
   </section>
 
-  <!-- ═══ HOME — LISTINGS ═══ -->
+  <!-- HOME -->
   <section id="home" class="page hidden">
     <div class="sec-hdr">
       <h2 class="sec-title">Listings</h2>
@@ -205,55 +227,39 @@
     </div>
   </section>
 
-  <!-- ═══ SELL ═══ -->
+  <!-- SELL -->
   <section id="sell" class="page hidden">
     <div class="page-card">
       <h2 class="ptitle">Create Listing</h2>
-      <div class="field">
-        <label class="flabel">Game Name</label>
-        <input id="game" placeholder="e.g. Valorant, FIFA 25, Genshin Impact">
-      </div>
-      <div class="field">
-        <label class="flabel">Account Details</label>
-        <textarea id="details" placeholder="Rank, level, skins, characters, coins..."></textarea>
-      </div>
-      <div class="field">
-        <label class="flabel">Price (USD)</label>
-        <input id="price" type="number" min="1" max="10000" placeholder="e.g. 50">
-      </div>
-      <div class="field">
-        <label class="flabel">Screenshot <span class="fhint">(optional)</span></label>
-        <input type="file" id="listingImg" accept="image/*" class="file-inp">
-      </div>
+      <div class="field"><label class="flabel">Game Name</label><input id="game" placeholder="e.g. Valorant, FIFA 25, Genshin Impact"></div>
+      <div class="field"><label class="flabel">Account Details</label><textarea id="details" placeholder="Rank, level, skins, characters, coins..."></textarea></div>
+      <div class="field"><label class="flabel">Price (USD)</label><input id="price" type="number" min="1" max="10000" placeholder="e.g. 50"></div>
+      <div class="field"><label class="flabel">Screenshot <span class="fhint">(optional)</span></label><input type="file" id="listingImg" accept="image/*" class="file-inp"></div>
       <div id="sellMsg" class="msg-box hidden"></div>
       <button class="btn-primary w100" onclick="createListing()">Post Listing</button>
     </div>
   </section>
 
-  <!-- ═══ ORDERS ═══ -->
+  <!-- ORDERS -->
   <section id="orders" class="page hidden">
-    <div class="sec-hdr">
-      <h2 class="sec-title">My Orders</h2>
-    </div>
+    <div class="sec-hdr"><h2 class="sec-title">My Orders</h2></div>
     <div id="ordersList"></div>
-    <div id="noOrders" class="empty hidden">
-      <div class="empty-icon">&#9670;</div>
-      <p>No orders yet</p>
-    </div>
+    <div id="noOrders" class="empty hidden"><div class="empty-icon">&#9670;</div><p>No orders yet</p></div>
   </section>
 
-  <!-- ═══ ORDER DETAIL ═══ -->
+  <!-- ORDER DETAIL -->
   <section id="order" class="page hidden">
     <div id="orderBox"></div>
   </section>
 
-  <!-- ═══ CHAT ═══ -->
+  <!-- CHAT -->
   <section id="chat" class="page hidden">
     <div class="chat-wrap">
       <div class="chat-hdr">
         <button class="back-btn" onclick="show('orders');loadOrders()">&#8592; Back</button>
         <span class="chat-title" id="chatTitle">Trade Chat</span>
         <span class="chat-pill" id="chatStatus"></span>
+        <button class="report-btn" onclick="fileReport()">&#9872; Report</button>
       </div>
       <div id="messages" class="msg-feed"></div>
       <div class="composer">
@@ -267,7 +273,7 @@
     </div>
   </section>
 
-  <!-- ═══ ADMIN ═══ -->
+  <!-- ADMIN -->
   <section id="admin" class="page hidden">
     <h2 class="sec-title" style="margin-bottom:20px">Admin Panel</h2>
     <div id="adminStats" class="stats-row"></div>
@@ -276,15 +282,18 @@
       <button class="atab" onclick="aTab(this,'aOrders')">Orders</button>
       <button class="atab" onclick="aTab(this,'aListings')">Listings</button>
       <button class="atab" onclick="aTab(this,'aChats')">Chats</button>
+      <button class="atab" onclick="aTab(this,'aReports')">Reports</button>
+      <button class="atab" onclick="aTab(this,'aUsers')">Users</button>
     </div>
     <div id="aVerify"   class="a-panel"></div>
     <div id="aOrders"   class="a-panel hidden"></div>
     <div id="aListings" class="a-panel hidden"></div>
     <div id="aChats"    class="a-panel hidden"></div>
+    <div id="aReports"  class="a-panel hidden"></div>
+    <div id="aUsers"    class="a-panel hidden"></div>
   </section>
 
 </main>
-
 <script src="script.js"></script>
 </body>
 </html>
