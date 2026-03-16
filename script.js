@@ -31,6 +31,74 @@ let currentChat = null;
 let chatUnsub   = null;   // unsubscribe fn for chat listener
 
 /* ═══════════════════════════════════════
+   SECURITY LAYER 1 — INPUT SANITIZATION
+   Prevents XSS by escaping all user data
+   before inserting into innerHTML
+═══════════════════════════════════════ */
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+}
+
+/* ═══════════════════════════════════════
+   SECURITY LAYER 2 — RATE LIMITING
+   Prevents brute force login attempts
+   and spam submissions client-side
+═══════════════════════════════════════ */
+const RateLimit = {
+  _counts: {},
+  _blocked: {},
+
+  check(key, maxAttempts, windowMs) {
+    const now = Date.now();
+
+    // Clear block if window expired
+    if (this._blocked[key] && now > this._blocked[key]) {
+      delete this._blocked[key];
+      delete this._counts[key];
+    }
+
+    // Still blocked
+    if (this._blocked[key]) {
+      const secs = Math.ceil((this._blocked[key] - now) / 1000);
+      alert('Too many attempts. Please wait ' + secs + ' seconds.');
+      return false;
+    }
+
+    // Init or increment
+    if (!this._counts[key]) this._counts[key] = { count: 0, start: now };
+    this._counts[key].count++;
+
+    // Reset if window passed
+    if (now - this._counts[key].start > windowMs) {
+      this._counts[key] = { count: 1, start: now };
+    }
+
+    // Block if over limit
+    if (this._counts[key].count > maxAttempts) {
+      this._blocked[key] = now + windowMs;
+      alert('Too many attempts. Please wait ' + (windowMs / 1000) + ' seconds.');
+      return false;
+    }
+
+    return true;
+  },
+
+  reset(key) {
+    delete this._counts[key];
+    delete this._blocked[key];
+  }
+};
+
+
+
+/* ═══════════════════════════════════════
    UI HELPERS
 ═══════════════════════════════════════ */
 function show(id) {
@@ -102,6 +170,9 @@ function adminTab(btn, panelId) {
    AUTH
 ═══════════════════════════════════════ */
 async function signup() {
+  // Rate limit: max 3 signups per 120 seconds
+  if (!RateLimit.check('signup', 3, 120000)) return;
+
   const email    = document.getElementById('signupEmail').value.trim();
   const password = document.getElementById('signupPassword').value.trim();
   const role     = document.getElementById('signupRole').value;
@@ -125,6 +196,9 @@ async function signup() {
 }
 
 async function login() {
+  // Rate limit: max 5 login attempts per 60 seconds
+  if (!RateLimit.check('login', 5, 60000)) return;
+
   const email    = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value.trim();
 
@@ -132,6 +206,7 @@ async function login() {
 
   try {
     await auth.signInWithEmailAndPassword(email, password);
+    RateLimit.reset('login'); // reset on success
   } catch (e) {
     alert(e.message);
   }
@@ -330,19 +405,18 @@ function loadListings() {
         const d = doc.data();
         const card = document.createElement('div');
         card.className = 'listing-card';
-        card.innerHTML = `
-          ${d.screenshot
-            ? `<img class="listing-img" src="${d.screenshot}" alt="${d.game}">`
-            : `<div class="listing-img-ph">No image</div>`}
-          <div class="listing-body">
-            <div class="listing-game">${d.game}</div>
-            <div class="listing-details">${d.details || ''}</div>
-            <div class="listing-footer">
-              <span class="listing-price">$${d.price}</span>
-              <button class="btn-primary" onclick="buy('${doc.id}')">Buy</button>
-            </div>
-          </div>
-        `;
+        card.innerHTML =
+          (d.screenshot
+            ? '<img class="listing-img" src="' + esc(d.screenshot) + '" alt="' + esc(d.game) + '">'
+            : '<div class="listing-img-ph">No image</div>') +
+          '<div class="listing-body">' +
+            '<div class="listing-game">' + esc(d.game) + '</div>' +
+            '<div class="listing-details">' + esc(d.details || '') + '</div>' +
+            '<div class="listing-footer">' +
+              '<span class="listing-price">$' + esc(String(d.price)) + '</span>' +
+              '<button class="btn-primary" onclick="buy('' + esc(doc.id) + '')">Buy</button>' +
+            '</div>' +
+          '</div>';
         grid.appendChild(card);
       });
     });
@@ -358,8 +432,13 @@ async function createListing() {
   const price   = parseFloat(document.getElementById('price').value);
   const imgFile = document.getElementById('listingImg').files[0];
 
-  if (!game)       return setMsg('sellMsg', 'Please enter the game name.', 'error');
-  if (!price || price < 1) return setMsg('sellMsg', 'Please enter a valid price.', 'error');
+  if (!game)                  return setMsg('sellMsg', 'Please enter the game name.', 'error');
+  if (game.length > 60)       return setMsg('sellMsg', 'Game name must be under 60 characters.', 'error');
+  if (details.length > 1000)  return setMsg('sellMsg', 'Details must be under 1000 characters.', 'error');
+  if (!price || price < 1)    return setMsg('sellMsg', 'Please enter a valid price.', 'error');
+  if (price > 10000)          return setMsg('sellMsg', 'Price cannot exceed $10,000.', 'error');
+  // Rate limit: max 3 listings per 60 seconds
+  if (!RateLimit.check('listing', 3, 60000)) return;
 
   const existing = await db.collection('listings')
     .where('seller', '==', auth.currentUser.uid)
@@ -514,39 +593,58 @@ function watchOrder(orderId) {
 function loadOrders() {
   if (!currentUser) return;
 
-  db.collection('orders')
-    .where('buyer', '==', currentUser.uid)
+  const list     = document.getElementById('ordersList');
+  const noOrders = document.getElementById('noOrders');
+  const allOrders = {};
+
+  function renderAll() {
+    list.innerHTML = '';
+    const entries = Object.values(allOrders);
+    if (entries.length === 0) {
+      noOrders.classList.remove('hidden');
+      return;
+    }
+    noOrders.classList.add('hidden');
+    entries.forEach(o => {
+      const isSeller = o.seller === currentUser.uid;
+      const card = document.createElement('div');
+      card.className = 'order-card';
+      card.innerHTML =
+        '<div class="order-card-header">' +
+          '<span class="order-id">ORDER #' + o._id.slice(-6).toUpperCase() + '</span>' +
+          statusBadge(o.status) +
+        '</div>' +
+        '<div class="order-game">' + o.game + '</div>' +
+        '<div class="order-meta">' +
+          '$' + o.price + ' &nbsp;&middot;&nbsp;' +
+          '<span style="color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:0.06em">' +
+            (isSeller ? 'You are selling' : 'You are buying') +
+          '</span>' +
+        '</div>' +
+        '<div class="order-actions">' +
+          '<button class="btn-outline" onclick="openOrder(\'' + o._id + '\');watchOrder(\'' + o._id + '\')">View Order</button>' +
+          ((o.status !== 'awaiting_fee' && o.status !== 'released' && o.status !== 'cancelled')
+            ? '<button class="btn-primary" onclick="openChat(\'' + o._id + '\',\'' + o.game + '\')">Chat</button>'
+            : '') +
+        '</div>';
+      list.appendChild(card);
+    });
+  }
+
+  // Listen to orders where user is buyer
+  db.collection('orders').where('buyer', '==', currentUser.uid)
     .onSnapshot(snap => {
-      const list    = document.getElementById('ordersList');
-      const noOrders = document.getElementById('noOrders');
-      list.innerHTML = '';
+      snap.forEach(doc => { allOrders[doc.id] = { ...doc.data(), _id: doc.id }; });
+      snap.docChanges().forEach(c => { if (c.type === 'removed') delete allOrders[c.doc.id]; });
+      renderAll();
+    });
 
-      if (snap.empty) {
-        noOrders.classList.remove('hidden');
-        return;
-      }
-      noOrders.classList.add('hidden');
-
-      snap.forEach(doc => {
-        const o = doc.data();
-        const card = document.createElement('div');
-        card.className = 'order-card';
-        card.innerHTML = `
-          <div class="order-card-header">
-            <span class="order-id">ORDER #${doc.id.slice(-6).toUpperCase()}</span>
-            ${statusBadge(o.status)}
-          </div>
-          <div class="order-game">${o.game}</div>
-          <div class="order-meta">$${o.price} listing</div>
-          <div class="order-actions">
-            <button class="btn-outline" onclick="openOrder('${doc.id}');watchOrder('${doc.id}')">View Order</button>
-            ${(o.status !== 'awaiting_fee' && o.status !== 'released' && o.status !== 'cancelled')
-              ? `<button class="btn-primary" onclick="openChat('${doc.id}','${o.game}')">Chat</button>`
-              : ''}
-          </div>
-        `;
-        list.appendChild(card);
-      });
+  // Listen to orders where user is seller
+  db.collection('orders').where('seller', '==', currentUser.uid)
+    .onSnapshot(snap => {
+      snap.forEach(doc => { allOrders[doc.id] = { ...doc.data(), _id: doc.id }; });
+      snap.docChanges().forEach(c => { if (c.type === 'removed') delete allOrders[c.doc.id]; });
+      renderAll();
     });
 }
 
@@ -573,7 +671,23 @@ async function submitServiceFee(orderId) {
    CHAT
 ═══════════════════════════════════════ */
 function cleanMessage(text) {
-  return text.replace(/(whatsapp|telegram|@|http|www\.|t\.me|\+\d{7,}|\d{9,})/gi, '[removed]');
+  if (!text) return '';
+  return text
+    // Phone numbers and contacts
+    .replace(/(\+\d[\d\s\-]{6,})/g, '[removed]')
+    .replace(/(\d[\d\s\-]{8,}\d)/g, '[removed]')
+    // Social / messaging platforms
+    .replace(/(whatsapp|telegram|wechat|snapchat|instagram|discord|skype|viber|signal|line|kik)/gi, '[removed]')
+    // Emails
+    .replace(/[\w.+-]+@[\w-]+\.[a-z]{2,}/gi, '[removed]')
+    // URLs
+    .replace(/(https?:\/\/|www\.)[^\s]*/gi, '[removed]')
+    .replace(/t\.me\/[^\s]*/gi, '[removed]')
+    // Short handles like @username
+    .replace(/@\w+/g, '[removed]')
+    // Trim and cap length
+    .trim()
+    .slice(0, 500);
 }
 
 async function openChat(orderId, gameTitle) {
@@ -608,6 +722,9 @@ async function openChat(orderId, gameTitle) {
   // Unsubscribe previous listener
   if (chatUnsub) chatUnsub();
 
+  // Store order data on the chat so we can label messages correctly
+  const iAmSeller = o.seller === currentUser.uid;
+
   chatUnsub = db.collection('chats').doc(orderId)
     .collection('messages')
     .orderBy('time')
@@ -616,21 +733,28 @@ async function openChat(orderId, gameTitle) {
       box.innerHTML = '';
 
       snap.forEach(doc => {
-        const m   = doc.data();
+        const m    = doc.data();
         const mine = m.sender === currentUser.uid;
         const div  = document.createElement('div');
         div.className = 'msg ' + (mine ? 'from-me' : 'from-other');
 
-        let imgs = '';
-        if (m.images && m.images.length > 0) {
-          imgs = m.images.map(u => `<img class="msg-img" src="${u}">`).join('');
+        // Label the other person correctly based on order roles
+        let senderLabel = '';
+        if (!mine) {
+          // The other person is whoever I am not
+          senderLabel = iAmSeller ? 'Buyer' : 'Seller';
         }
 
-        div.innerHTML = `
-          ${!mine ? `<div class="msg-sender">Seller</div>` : ''}
-          ${m.text ? `<div>${m.text}</div>` : ''}
-          ${imgs}
-        `;
+        let imgs = '';
+        if (m.images && m.images.length > 0) {
+          imgs = m.images.map(u => '<img class="msg-img" src="' + u + '">').join('');
+        }
+
+        div.innerHTML =
+          (senderLabel ? '<div class="msg-sender">' + esc(senderLabel) + '</div>' : '') +
+          (m.text ? '<div>' + esc(m.text) + '</div>' : '') +
+          imgs;
+
         box.appendChild(div);
       });
 
@@ -640,6 +764,8 @@ async function openChat(orderId, gameTitle) {
 
 async function sendMessage() {
   if (!currentChat) return;
+  // Rate limit: max 10 messages per 10 seconds (anti-spam)
+  if (!RateLimit.check('chat', 10, 10000)) return;
 
   const orderSnap = await db.collection('orders').doc(currentChat).get();
   if (!orderSnap.exists) return;
@@ -939,10 +1065,10 @@ async function adminViewChat(orderId) {
 
   logEl.innerHTML = msgs.docs.map(d => {
     const m = d.data();
-    return `<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
-      <span style="color:var(--t3)">${m.sender.slice(0,8)}...</span>
-      <span style="margin-left:8px;color:var(--t2)">${m.text || '[image]'}</span>
-    </div>`;
+    return '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">' +
+      '<span style="color:var(--t3)">' + esc(m.sender.slice(0,8)) + '...</span>' +
+      '<span style="margin-left:8px;color:var(--t2)">' + esc(m.text || '[image]') + '</span>' +
+    '</div>';
   }).join('');
 }
 
