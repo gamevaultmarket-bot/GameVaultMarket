@@ -853,6 +853,31 @@ strong  { color: var(--t1); font-weight: 500; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { opacity: .8; }
 
+
+/* ── NOTIFICATION BADGE ── */
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--red);
+  color: #fff;
+  font-family: var(--fb);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 9px;
+  margin-left: 5px;
+  vertical-align: middle;
+  animation: badgePop .2s ease both;
+}
+
+@keyframes badgePop {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
 /* ── ANIMATION ── */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(8px); }
