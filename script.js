@@ -550,40 +550,49 @@ async function createListing() {
 async function doBuy(listingId) {
   if (!currentUser) return alert('Please log in first.');
 
-  const listing = await db.collection('listings').doc(listingId).get();
-  if (!listing.exists) return alert('Listing not found.');
+  try {
+    const listing = await db.collection('listings').doc(listingId).get();
+    if (!listing.exists) return alert('Listing not found.');
 
-  const d = listing.data();
-  if (d.seller === currentUser.uid) return alert('You cannot buy your own listing.');
+    const d = listing.data();
+    if (d.seller === currentUser.uid) return alert('You cannot buy your own listing.');
 
-  // Check if this buyer already has an active order on this listing
-  const myOrder = await db.collection('orders')
-    .where('listingId','==', listingId)
-    .where('buyer','==', currentUser.uid)
-    .where('status','in',['awaiting_fee','paid_waiting_seller','paid']).get();
-  if (!myOrder.empty) return alert('You already have an active order for this listing.');
+    // Check if this buyer already has an active order on this listing.
+    // Query by listingId + buyer only (no 'in' filter) to avoid needing
+    // a composite index. Filter status client-side.
+    const myOrderSnap = await db.collection('orders')
+      .where('listingId','==', listingId)
+      .where('buyer','==', currentUser.uid).get();
+    const activeStatuses = ['awaiting_fee','paid_waiting_seller','paid'];
+    const myActive = myOrderSnap.docs.filter(d => activeStatuses.includes(d.data().status));
+    if (myActive.length > 0) return alert('You already have an active order for this listing.');
 
-  // Max 5 buyers per listing
-  const activeOrders = await db.collection('orders')
-    .where('listingId','==', listingId)
-    .where('status','in',['awaiting_fee','paid_waiting_seller','paid']).get();
-  if (activeOrders.size >= MAX_BUYERS)
-    return alert('This listing has reached the maximum of 5 active buyers. Try again later.');
+    // Max 5 buyers per listing — query by listingId only, filter client-side
+    const allOrdersSnap = await db.collection('orders')
+      .where('listingId','==', listingId).get();
+    const activeCount = allOrdersSnap.docs.filter(d => activeStatuses.includes(d.data().status)).length;
+    if (activeCount >= MAX_BUYERS)
+      return alert('This listing has reached the maximum of 5 active buyers. Try again later.');
 
-  const ref = await db.collection('orders').add({
-    listingId, buyer: currentUser.uid, seller: d.seller,
-    game: d.game, price: d.price, status: 'awaiting_fee',
-    created: firebase.firestore.FieldValue.serverTimestamp()
-  });
+    const ref = await db.collection('orders').add({
+      listingId, buyer: currentUser.uid, seller: d.seller,
+      game: d.game, price: d.price, status: 'awaiting_fee',
+      created: firebase.firestore.FieldValue.serverTimestamp()
+    });
 
-  // Create chat doc so the listener can attach
-  await db.collection('chats').doc(ref.id).set({
-    orderId: ref.id, buyer: currentUser.uid, seller: d.seller,
-    created: firebase.firestore.FieldValue.serverTimestamp()
-  });
+    // Create chat doc so the listener can attach
+    await db.collection('chats').doc(ref.id).set({
+      orderId: ref.id, buyer: currentUser.uid, seller: d.seller,
+      created: firebase.firestore.FieldValue.serverTimestamp()
+    });
 
-  openOrder(ref.id);
-  watchOrder(ref.id);
+    openOrder(ref.id);
+    watchOrder(ref.id);
+
+  } catch (err) {
+    console.error('Buy error:', err);
+    alert('Something went wrong: ' + err.message);
+  }
 }
 
 /* ════════════════════════════════════════
