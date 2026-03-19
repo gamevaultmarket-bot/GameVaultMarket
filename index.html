@@ -65,60 +65,46 @@
 
 <main>
 
-  <!-- AUTH -->
+  <!-- AUTH — PHONE STEP -->
   <section id="auth" class="page">
     <div class="auth-box">
       <div class="auth-logo">GAME<span>VAULT</span></div>
       <p class="auth-tagline">P2P Gaming Account Marketplace</p>
-      <div class="tab-row">
-        <button class="tab active" id="tabLogin" onclick="authTab('login')">Login</button>
-        <button class="tab" id="tabSignup" onclick="authTab('signup')">Sign Up</button>
-      </div>
-      <div id="loginForm">
+
+      <!-- Step 1: enter phone -->
+      <div id="phoneStep">
         <div class="field">
-          <label class="flabel">Email</label>
-          <input id="loginEmail" type="email" placeholder="you@email.com">
-        </div>
-        <div class="field">
-          <label class="flabel">Password</label>
-          <input id="loginPassword" type="password" placeholder="••••••••">
-        </div>
-        <div id="loginMsg" class="msg-box hidden"></div>
-        <button class="btn-primary w100" onclick="doLogin()">Login</button>
-      </div>
-      <div id="signupForm" class="hidden">
-        <div class="field">
-          <label class="flabel">Email</label>
-          <input id="signupEmail" type="email" placeholder="you@email.com">
-        </div>
-        <div class="field">
-          <label class="flabel">Password <span class="fhint">(min 6 chars)</span></label>
-          <input id="signupPassword" type="password" placeholder="••••••••">
+          <label class="flabel">Phone Number</label>
+          <input id="phoneInput" type="tel" placeholder="+233 XX XXX XXXX">
+          <div style="font-size:11px;color:var(--t3);margin-top:4px">Include country code e.g. +233 for Ghana</div>
         </div>
         <div class="field">
           <label class="flabel">I want to</label>
-          <select id="signupRole">
+          <select id="phoneRole">
             <option value="buyer">Buy game accounts</option>
             <option value="seller">Sell game accounts</option>
           </select>
         </div>
-        <div id="signupMsg" class="msg-box hidden"></div>
-        <button class="btn-primary w100" onclick="doSignup()">Create Account</button>
+        <div id="phoneMsg" class="msg-box hidden"></div>
+        <div id="recaptcha-container"></div>
+        <button class="btn-primary w100" onclick="sendOTP()">Send OTP</button>
       </div>
-    </div>
-  </section>
 
-  <!-- VERIFY EMAIL -->
-  <section id="verifyEmail" class="page hidden">
-    <div class="page-card" style="text-align:center">
-      <div style="font-size:40px;margin-bottom:14px">&#9993;</div>
-      <h2 class="ptitle">Check Your Email</h2>
-      <p class="psub" style="margin-top:8px">We sent a verification link to your email address. Click it to activate your account.</p>
-      <div style="margin:20px 0;padding:14px;background:var(--bg3);border-radius:var(--r);font-size:13px;color:var(--t2)">
-        Did not receive it? Check your spam folder or tap below to resend.
+      <!-- Step 2: enter OTP -->
+      <div id="otpStep" class="hidden">
+        <div style="text-align:center;margin-bottom:20px">
+          <div style="font-size:36px;margin-bottom:10px">&#128241;</div>
+          <div style="font-size:13px;color:var(--t2)">Enter the 6-digit code sent to</div>
+          <div id="otpPhoneDisplay" style="font-size:16px;font-weight:500;color:var(--accent);margin-top:6px"></div>
+        </div>
+        <div class="field">
+          <label class="flabel">Verification Code</label>
+          <input id="otpInput" type="tel" inputmode="numeric" placeholder="123456" maxlength="6">
+        </div>
+        <div id="otpMsg" class="msg-box hidden"></div>
+        <button class="btn-primary w100" onclick="verifyOTP()">Verify &amp; Continue</button>
+        <button class="btn-outline w100" style="margin-top:8px" onclick="backToPhone()">&#8592; Change Number</button>
       </div>
-      <button class="btn-outline w100" onclick="resendVerification()">Resend Verification Email</button>
-      <button class="btn-primary w100" style="margin-top:10px" onclick="checkVerified()">I Verified — Continue</button>
     </div>
   </section>
 
